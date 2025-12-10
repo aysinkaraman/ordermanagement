@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET activities for a card
 export async function GET(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: { cardId: string } }
 ) {
   try {
