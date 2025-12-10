@@ -45,25 +45,25 @@ export async function POST(request: NextRequest) {
     
     // Check tags ONLY - priority has highest precedence, stop after first match
     for (const tag of tags) {
-      if (tag === 'priority') {
+      if (tag.includes('priority')) {
         targetColumn = 'Priority';
         foundTag = true;
-        console.log('🔥 Priority order detected - STOPPING here, ignoring other tags');
+        console.log('🔥 Priority order detected from tag:', tag, '- STOPPING here, ignoring other tags');
         break;
-      } else if (tag === 'express') {
+      } else if (tag.includes('express')) {
         targetColumn = 'Express';
         foundTag = true;
-        console.log('⚡ Express order detected - STOPPING here');
+        console.log('⚡ Express order detected from tag:', tag, '- STOPPING here');
         break;
-      } else if (tag === 'ground' || tag === 'ground shipping' || tag === 'shipping' || tag === 'free ground shipping') {
+      } else if (tag.includes('ground') || tag.includes('shipping')) {
         targetColumn = 'Ground';
         foundTag = true;
-        console.log('🚚 Ground order detected - STOPPING here');
+        console.log('🚚 Ground order detected from tag:', tag, '- STOPPING here');
         break;
-      } else if (tag === 'pickup' || tag === 'shop location') {
+      } else if (tag.includes('pickup') || tag.includes('shop location')) {
         targetColumn = 'Pickup';
         foundTag = true;
-        console.log('📍 Pickup order detected - STOPPING here');
+        console.log('📍 Pickup order detected from tag:', tag, '- STOPPING here');
         break;
       }
     }
