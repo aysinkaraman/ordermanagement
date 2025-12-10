@@ -189,6 +189,8 @@ export default function App() {
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [boards, setBoards] = useState<any[]>([]);
   const [showBoardSelector, setShowBoardSelector] = useState(false);
+  const [newBoardTitle, setNewBoardTitle] = useState('');
+  const [creatingBoard, setCreatingBoard] = useState(false);
   
   // Teams
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -421,6 +423,43 @@ export default function App() {
       alert('Failed to update profile');
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleCreateBoard = async () => {
+    if (!newBoardTitle.trim()) {
+      alert('Please enter a board title');
+      return;
+    }
+
+    setCreatingBoard(true);
+    try {
+      const response = await fetch('/api/boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newBoardTitle, isPublic: false }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create board');
+      }
+
+      const newBoard = await response.json();
+      setBoards([...boards, newBoard]);
+      setNewBoardTitle('');
+      alert('✅ Board created successfully!');
+      
+      // Switch to new board
+      setCurrentBoardId(newBoard.id);
+      setBoardTitle(newBoard.title);
+      loadBoardMembers(newBoard.id);
+      setShowBoardSelector(false);
+      window.location.reload();
+    } catch (e: any) {
+      console.error('Create board error:', e);
+      alert(`❌ ${e.message || 'Failed to create board'}`);
+    } finally {
+      setCreatingBoard(false);
     }
   };
 
@@ -2929,6 +2968,34 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>📋 My Boards</h2>
             <button onClick={() => setShowBoardSelector(false)} style={{ ...iconBtnStyle, fontSize: 20 }}>✕</button>
+          </div>
+
+          {/* Create New Board */}
+          <div style={{ marginBottom: 24, padding: 16, background: '#f0f9ff', borderRadius: 8, border: '2px dashed #3b82f6' }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#1e40af' }}>
+              ➕ Create New Board
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                value={newBoardTitle}
+                onChange={(e) => setNewBoardTitle(e.target.value)}
+                placeholder="Enter board title..."
+                style={{ ...inputStyle, flex: 1 }}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
+              />
+              <button
+                onClick={handleCreateBoard}
+                disabled={creatingBoard || !newBoardTitle.trim()}
+                style={{
+                  ...primaryBtnStyle,
+                  opacity: creatingBoard || !newBoardTitle.trim() ? 0.5 : 1,
+                  cursor: creatingBoard || !newBoardTitle.trim() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {creatingBoard ? '⏳' : '➕ Create'}
+              </button>
+            </div>
           </div>
 
           {/* Boards List */}
