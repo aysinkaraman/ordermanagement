@@ -94,32 +94,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Ensure all required columns exist
-    const existingColumnTitles = board.columns.map(c => c.title);
-    for (const colTitle of DEFAULT_COLUMNS) {
-      if (!existingColumnTitles.includes(colTitle)) {
-        console.log('📋 Creating missing column:', colTitle);
-        await prisma.column.create({
-          data: {
-            title: colTitle,
-            order: board.columns.length,
-            boardId: board.id,
-          }
-        });
-      }
-    }
-    
-    // Reload board with all columns
-    board = await prisma.board.findUnique({
-      where: { id: board.id },
-      include: { columns: { orderBy: { order: 'asc' } } }
-    });
-
-    if (!board) {
-      return NextResponse.json({ error: 'Board not found' }, { status: 500 });
-    }
-
-    // Get target column
+    // Get target column (don't create if missing - user should create manually)
     const column = board.columns.find(c => c.title === targetColumn);
     
     if (!column) {
