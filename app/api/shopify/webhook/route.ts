@@ -31,47 +31,45 @@ export async function POST(request: NextRequest) {
     const order = JSON.parse(rawBody);
     console.log('📦 New order webhook received:', order.order_number);
 
-    // Determine target column based on tags and shipping type
+    // Determine target column based on tags ONLY (ignore shipping lines)
     let targetColumn = 'Ground'; // default
+    let foundTag = false;
     
     // Parse tags
     let tags: string[] = [];
     if (order.tags && typeof order.tags === 'string') {
       tags = order.tags.toLowerCase().split(',').map((t: string) => t.trim());
-      console.log('🏷️ Order tags:', tags);
+      console.log('🏷️ Raw tags string:', order.tags);
+      console.log('🏷️ Parsed tags array:', tags);
     }
     
-    // 1. Check tags first (priority has highest precedence)
-    if (tags.includes('priority')) {
-      targetColumn = 'Priority';
-      console.log('🔥 Priority order detected from tag');
-    } else if (tags.includes('express')) {
-      targetColumn = 'Express';
-      console.log('⚡ Express order detected from tag');
-    } else if (tags.includes('ground') || tags.includes('shipping')) {
-      targetColumn = 'Ground';
-      console.log('🚚 Ground order detected from tag');
-    } else if (tags.includes('pickup') || tags.includes('shop location')) {
-      targetColumn = 'Pickup';
-      console.log('📍 Pickup order detected from tag');
-    }
-    
-    // 2. If not determined by tags, check shipping lines
-    if (targetColumn === 'Ground' && order.shipping_lines && order.shipping_lines.length > 0) {
-      const shippingTitle = order.shipping_lines[0].title.toLowerCase();
-      const shippingCode = order.shipping_lines[0].code?.toLowerCase() || '';
-      
-      console.log('🚚 Shipping:', shippingTitle, '- Code:', shippingCode);
-      
-      if (shippingTitle.includes('express') || shippingCode.includes('express')) {
+    // Check tags ONLY - priority has highest precedence, stop after first match
+    for (const tag of tags) {
+      if (tag === 'priority') {
+        targetColumn = 'Priority';
+        foundTag = true;
+        console.log('🔥 Priority order detected - STOPPING here, ignoring other tags');
+        break;
+      } else if (tag === 'express') {
         targetColumn = 'Express';
-      } else if (shippingTitle.includes('ground') || shippingTitle.includes('shipping')) {
+        foundTag = true;
+        console.log('⚡ Express order detected - STOPPING here');
+        break;
+      } else if (tag === 'ground' || tag === 'ground shipping' || tag === 'shipping') {
         targetColumn = 'Ground';
-      } else if (shippingTitle.includes('pickup') || shippingTitle.includes('shop location') || shippingCode.includes('pickup')) {
+        foundTag = true;
+        console.log('🚚 Ground order detected - STOPPING here');
+        break;
+      } else if (tag === 'pickup' || tag === 'shop location') {
         targetColumn = 'Pickup';
+        foundTag = true;
+        console.log('📍 Pickup order detected - STOPPING here');
+        break;
       }
-      
-      console.log('📍 Target column from shipping:', targetColumn);
+    }
+    
+    if (!foundTag) {
+      console.log('⚠️ No matching tag found, using default: Ground');
     }
     
     console.log('✅ Final target column:', targetColumn);

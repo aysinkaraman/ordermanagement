@@ -665,13 +665,18 @@ export default function App() {
     loadTeams();
   }, []);
 
-  // Auto-refresh every 10 seconds when board is active
+  // Auto-refresh every 5 seconds when board is active
   useEffect(() => {
     if (!currentBoardId) return;
 
+    // Initial refresh
+    refreshBoardData();
+
+    // Set up interval
     const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing board data...');
       refreshBoardData();
-    }, 10000); // 10 seconds
+    }, 5000); // 5 seconds
 
     return () => clearInterval(interval);
   }, [currentBoardId]);
