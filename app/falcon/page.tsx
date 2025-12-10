@@ -188,6 +188,16 @@ export default function App() {
   const [sharingLoading, setSharingLoading] = useState(false);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   
+  // Teams
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<any>(null);
+  const [teamName, setTeamName] = useState('');
+  const [teamDescription, setTeamDescription] = useState('');
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [teamEmail, setTeamEmail] = useState('');
+  const [teamMemberRole, setTeamMemberRole] = useState('member');
+  
   const themePresets = [
     { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
     { name: 'Blue Ocean', primary: '#0284C7', secondary: '#075985' },
@@ -478,7 +488,81 @@ export default function App() {
     }
   };
 
-  // Load current board on mount
+  // Team functions
+  const loadTeams = async () => {
+    try {
+      const res = await fetch('/api/teams');
+      const data = await res.json();
+      setTeams(data);
+    } catch (e) {
+      console.error('Failed to load teams', e);
+    }
+  };
+
+  const handleCreateTeam = async () => {
+    if (!teamName.trim()) {
+      alert('Team name is required');
+      return;
+    }
+
+    setTeamSaving(true);
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: teamName, description: teamDescription }),
+      });
+      const team = await res.json();
+      alert(`✅ Team "${team.name}" created!`);
+      setTeamName('');
+      setTeamDescription('');
+      loadTeams();
+    } catch (e) {
+      alert('❌ Failed to create team');
+    } finally {
+      setTeamSaving(false);
+    }
+  };
+
+  const handleAddTeamMember = async (teamId: string) => {
+    if (!teamEmail.trim()) {
+      alert('Email is required');
+      return;
+    }
+
+    try {
+      await fetch(`/api/teams/${teamId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: teamEmail, role: teamMemberRole }),
+      });
+      alert(`✅ Member added to team`);
+      setTeamEmail('');
+      if (selectedTeam?.id === teamId) {
+        const res = await fetch(`/api/teams/${teamId}`);
+        setSelectedTeam(await res.json());
+      }
+    } catch (e: any) {
+      alert(`❌ Failed to add member`);
+    }
+  };
+
+  const handleRemoveTeamMember = async (teamId: string, memberId: string) => {
+    if (!confirm('Remove this member from team?')) return;
+
+    try {
+      await fetch(`/api/teams/${teamId}/members/${memberId}`, { method: 'DELETE' });
+      alert('✅ Member removed from team');
+      if (selectedTeam?.id === teamId) {
+        const res = await fetch(`/api/teams/${teamId}`);
+        setSelectedTeam(await res.json());
+      }
+    } catch (e) {
+      alert('❌ Failed to remove member');
+    }
+  };
+
+  // Load current board and teams on mount
   useEffect(() => {
     (async () => {
       try {
@@ -488,6 +572,7 @@ export default function App() {
           setCurrentBoardId(boards[0].id);
           loadBoardMembers(boards[0].id);
         }
+        loadTeams();
       } catch (e) {
         console.error('Failed to load board', e);
       }
@@ -1840,6 +1925,27 @@ export default function App() {
           return null;
         })()}
 
+        {/* Teams */}
+        <button
+          onClick={() => setShowTeamModal(!showTeamModal)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'rgba(168, 85, 247, 0.9)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Manage teams"
+        >
+          🏢 Teams
+        </button>
+
         {/* Share Board */}
         <button
           onClick={() => setShowShareModal(!showShareModal)}
@@ -2738,6 +2844,7 @@ export default function App() {
       {renderThemePicker()}
       {renderProfileModal()}
       {renderShareModal()}
+      {renderTeamModal()}
     </div>
   );
 
@@ -2911,5 +3018,288 @@ export default function App() {
       </div>
     </div>
   );
+  }
+
+  function renderTeamModal() {
+    if (!showTeamModal) return null;
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}
+        onClick={() => { setShowTeamModal(false); setSelectedTeam(null); }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 600,
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>🏢 Teams</h2>
+            <button onClick={() => { setShowTeamModal(false); setSelectedTeam(null); }} style={{ ...iconBtnStyle, fontSize: 20 }}>✕</button>
+          </div>
+
+          {!selectedTeam ? (
+            <>
+              {/* Create Team Form */}
+              <div style={{ marginBottom: 24, padding: 16, background: '#f9fafb', borderRadius: 8 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Create New Team</h3>
+                <input
+                  type="text"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="Team name (e.g., Marketing Team)"
+                  style={{ ...inputStyle, marginBottom: 8 }}
+                />
+                <textarea
+                  value={teamDescription}
+                  onChange={(e) => setTeamDescription(e.target.value)}
+                  placeholder="Team description (optional)"
+                  style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
+                />
+                <button
+                  onClick={handleCreateTeam}
+                  disabled={teamSaving || !teamName.trim()}
+                  style={{
+                    marginTop: 8,
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: teamSaving || !teamName.trim() ? '#ccc' : primaryColor,
+                    color: '#fff',
+                    cursor: teamSaving || !teamName.trim() ? 'not-allowed' : 'pointer',
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
+                >
+                  {teamSaving ? 'Creating...' : '➕ Create Team'}
+                </button>
+              </div>
+
+              {/* Teams List */}
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Your Teams ({teams.length})</h3>
+                {teams.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: 'center', color: '#999', fontSize: 13 }}>
+                    No teams yet. Create your first team above!
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {teams.map((team) => (
+                      <div
+                        key={team.id}
+                        onClick={() => setSelectedTeam(team)}
+                        style={{
+                          padding: 16,
+                          background: '#f9fafb',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          border: '2px solid transparent',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f3f4f6';
+                          e.currentTarget.style.borderColor = primaryColor;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f9fafb';
+                          e.currentTarget.style.borderColor = 'transparent';
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>{team.name}</div>
+                            {team.description && (
+                              <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>{team.description}</div>
+                            )}
+                            <div style={{ fontSize: 12, color: '#999' }}>
+                              👥 {team._count.members} members · 📋 {team._count.boards} boards
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 20 }}>→</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Team Details */}
+              <button
+                onClick={() => setSelectedTeam(null)}
+                style={{ ...secondaryBtnStyle, marginBottom: 16, padding: '6px 12px', fontSize: 13 }}
+              >
+                ← Back to Teams
+              </button>
+
+              <div style={{ marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{selectedTeam.name}</h3>
+                {selectedTeam.description && (
+                  <p style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>{selectedTeam.description}</p>
+                )}
+              </div>
+
+              {/* Add Member */}
+              <div style={{ marginBottom: 20, padding: 16, background: '#f9fafb', borderRadius: 8 }}>
+                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Add Team Member</h4>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="email"
+                    value={teamEmail}
+                    onChange={(e) => setTeamEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <select
+                    value={teamMemberRole}
+                    onChange={(e) => setTeamMemberRole(e.target.value)}
+                    style={{ ...inputStyle, width: 120 }}
+                  >
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => handleAddTeamMember(selectedTeam.id)}
+                  disabled={!teamEmail.trim()}
+                  style={{
+                    marginTop: 8,
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: !teamEmail.trim() ? '#ccc' : primaryColor,
+                    color: '#fff',
+                    cursor: !teamEmail.trim() ? 'not-allowed' : 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  ➕ Add Member
+                </button>
+              </div>
+
+              {/* Members List */}
+              <div>
+                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Members ({selectedTeam.members?.length || 0})</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(selectedTeam.members || []).map((member: any) => (
+                    <div
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        background: '#f9fafb',
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background: primaryColor,
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 14,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {member.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{member.user.name}</div>
+                          <div style={{ fontSize: 11, color: '#666' }}>{member.user.email}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            padding: '3px 6px',
+                            background: '#e5e7eb',
+                            borderRadius: 3,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {member.role}
+                        </span>
+                        {member.user.id !== selectedTeam.ownerId && (
+                          <button
+                            onClick={() => handleRemoveTeamMember(selectedTeam.id, member.id)}
+                            style={{
+                              padding: '3px 6px',
+                              fontSize: 11,
+                              borderRadius: 3,
+                              border: 'none',
+                              background: '#fee',
+                              color: '#c00',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Boards */}
+              <div style={{ marginTop: 20 }}>
+                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Team Boards ({selectedTeam.boards?.length || 0})</h4>
+                {(selectedTeam.boards || []).length === 0 ? (
+                  <div style={{ padding: 12, textAlign: 'center', color: '#999', fontSize: 13, background: '#f9fafb', borderRadius: 6 }}>
+                    No boards yet
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {(selectedTeam.boards || []).map((board: any) => (
+                      <div
+                        key={board.id}
+                        style={{
+                          padding: 10,
+                          background: '#f9fafb',
+                          borderRadius: 6,
+                          fontSize: 13,
+                        }}
+                      >
+                        📋 {board.title}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 }
