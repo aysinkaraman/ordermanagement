@@ -31,19 +31,32 @@ export async function POST(request: NextRequest) {
     const order = JSON.parse(rawBody);
     console.log('📦 New order webhook received:', order.order_number);
 
-    // Determine target column based on priority and shipping type
+    // Determine target column based on tags and shipping type
     let targetColumn = 'Ground'; // default
     
-    // 1. Check if order has "priority" tag
+    // Parse tags
+    let tags: string[] = [];
     if (order.tags && typeof order.tags === 'string') {
-      const tags = order.tags.toLowerCase().split(',').map((t: string) => t.trim());
-      if (tags.includes('priority')) {
-        targetColumn = 'Priority';
-        console.log('🔥 Priority order detected');
-      }
+      tags = order.tags.toLowerCase().split(',').map((t: string) => t.trim());
+      console.log('🏷️ Order tags:', tags);
     }
     
-    // 2. If not priority, check shipping type
+    // 1. Check tags first (priority has highest precedence)
+    if (tags.includes('priority')) {
+      targetColumn = 'Priority';
+      console.log('🔥 Priority order detected from tag');
+    } else if (tags.includes('express')) {
+      targetColumn = 'Express';
+      console.log('⚡ Express order detected from tag');
+    } else if (tags.includes('ground') || tags.includes('shipping')) {
+      targetColumn = 'Ground';
+      console.log('🚚 Ground order detected from tag');
+    } else if (tags.includes('pickup')) {
+      targetColumn = 'Pickup';
+      console.log('📍 Pickup order detected from tag');
+    }
+    
+    // 2. If not determined by tags, check shipping lines
     if (targetColumn === 'Ground' && order.shipping_lines && order.shipping_lines.length > 0) {
       const shippingTitle = order.shipping_lines[0].title.toLowerCase();
       const shippingCode = order.shipping_lines[0].code?.toLowerCase() || '';
@@ -58,8 +71,10 @@ export async function POST(request: NextRequest) {
         targetColumn = 'Pickup';
       }
       
-      console.log('📍 Target column:', targetColumn);
+      console.log('📍 Target column from shipping:', targetColumn);
     }
+    
+    console.log('✅ Final target column:', targetColumn);
 
     // Get or create the main Shopify board
     const boardTitle = 'Shopify Orders';
