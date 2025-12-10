@@ -23,8 +23,39 @@ model User {
   cards       Card[]
   comments    Comment[]
   activities  Activity[]
+  ownedBoards Board[]  @relation("BoardOwner")
+  boardMembers BoardMember[]
 
   @@index([email])
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  title       String   @default("My Kanban Board")
+  isPublic    Boolean  @default(false)
+  ownerId     String
+  owner       User     @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  columns     Column[]
+  members     BoardMember[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([isPublic])
+}
+
+model BoardMember {
+  id        String   @id @default(cuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member") // "owner", "admin", "member"
+  createdAt DateTime @default(now())
+
+  @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
 }
 
 model Column {
@@ -32,6 +63,8 @@ model Column {
   title      String
   order      Int
   isArchived Boolean  @default(false)
+  boardId    String?
+  board      Board?   @relation(fields: [boardId], references: [id], onDelete: Cascade)
   userId     String?
   user       User?    @relation(fields: [userId], references: [id])
   cards      Card[]
@@ -40,6 +73,7 @@ model Column {
 
   @@index([order])
   @@index([isArchived])
+  @@index([boardId])
   @@index([userId])
 }
 
