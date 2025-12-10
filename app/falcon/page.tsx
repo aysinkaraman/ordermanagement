@@ -454,9 +454,22 @@ export default function App() {
         throw new Error(data.error || 'Failed to add member');
       }
 
-      alert(`✅ Successfully added ${shareEmail} to your board!`);
+      if (data.needsInvite && data.inviteLink) {
+        // User doesn't exist - show invite link
+        const shareLink = confirm(
+          `✉️ ${shareEmail} needs to register first!\n\n` +
+          `Share this link with them:\n${data.inviteLink}\n\n` +
+          `Click OK to copy the link.`
+        );
+        if (shareLink) {
+          navigator.clipboard.writeText(data.inviteLink);
+          alert('✅ Invite link copied to clipboard!');
+        }
+      } else {
+        alert(`✅ Successfully added ${shareEmail} to your board!`);
+        if (boardId) loadBoardMembers(boardId);
+      }
       setShareEmail('');
-      if (boardId) loadBoardMembers(boardId);
     } catch (e: any) {
       console.error('Share board error:', e);
       alert(`❌ ${e.message || 'Failed to add member'}`);

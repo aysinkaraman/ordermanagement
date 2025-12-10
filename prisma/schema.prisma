@@ -19,16 +19,36 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  columns      Column[]
-  cards        Card[]
-  comments     Comment[]
-  activities   Activity[]
-  ownedBoards  Board[]  @relation("BoardOwner")
-  boardMembers BoardMember[]
-  ownedTeams   Team[]   @relation("TeamOwner")
-  teamMembers  TeamMember[]
+  columns         Column[]
+  cards           Card[]
+  comments        Comment[]
+  activities      Activity[]
+  ownedBoards     Board[]  @relation("BoardOwner")
+  boardMembers    BoardMember[]
+  ownedTeams      Team[]   @relation("TeamOwner")
+  teamMembers     TeamMember[]
+  sentInvitations Invitation[] @relation("InvitationSender")
 
   @@index([email])
+}
+
+model Invitation {
+  id         String   @id @default(cuid())
+  email      String
+  token      String   @unique
+  boardId    String?
+  teamId     String?
+  role       String   @default("member")
+  senderId   String
+  sender     User     @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  accepted   Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([boardId])
+  @@index([teamId])
 }
 
 model Team {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 
-// POST /api/boards/:id/members - Add member to board
+// POST /api/boards/:id/members - Add member to board or create invitation
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -37,7 +37,29 @@ export async function POST(
     });
 
     if (!userToAdd) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      // User doesn't exist - create invitation
+      const { randomBytes } = await import('crypto');
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await prisma.invitation.create({
+        data: {
+          email,
+          token,
+          boardId: params.id,
+          role: role || 'member',
+          senderId: userId,
+          expiresAt
+        }
+      });
+
+      const inviteLink = `https://falconordermanagement.com/register?invite=${token}`;
+
+      return NextResponse.json({ 
+        message: 'Invitation sent! Share this link with them.',
+        inviteLink,
+        needsInvite: true
+      });
     }
 
     // Check if already member
@@ -68,7 +90,10 @@ export async function POST(
       }
     });
 
-    return NextResponse.json(member);
+    return NextResponse.json({ 
+      message: 'Member added successfully',
+      member 
+    });
   } catch (error) {
     console.error('Add member error:', error);
     return NextResponse.json({ error: 'Failed to add member' }, { status: 500 });
