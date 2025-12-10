@@ -14,7 +14,7 @@ interface CardModalProps {
 
 export const CardModal: React.FC<CardModalProps> = ({
   card,
-  columnId,
+  columnId: _columnId,
   onClose,
   onSave,
 }) => {
@@ -28,7 +28,7 @@ export const CardModal: React.FC<CardModalProps> = ({
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);

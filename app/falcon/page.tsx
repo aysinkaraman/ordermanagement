@@ -35,8 +35,6 @@ const inputStyle: React.CSSProperties = {
 };
 
 const BRAND_PRIMARY = '#D97706';
-const BRAND_SECONDARY = '#78350F';
-const BRAND_LIGHT = '#FEF3C7';
 
 const primaryBtnStyle: React.CSSProperties = {
   padding: '10px 12px',
@@ -148,7 +146,7 @@ export default function App() {
   const [attachmentNotes, setAttachmentNotes] = useState<Record<string | number, string>>({});
   const [attachmentSaving, setAttachmentSaving] = useState<string | number | null>(null);
 
-  const [dragging, setDragging] = useState(false);
+  const [_dragging, setDragging] = useState(false);
   const dragDataRef = useRef<{ cardId: string | number | null; fromColumnId: string | number | null }>({
     cardId: null,
     fromColumnId: null,
@@ -406,34 +404,6 @@ export default function App() {
       alert('Failed to update profile');
     } finally {
       setProfileSaving(false);
-    }
-  };
-
-  const handleShopifyImport = async () => {
-    if (!window.confirm('Import orders from Shopify? This will create cards for new orders.')) {
-      return;
-    }
-
-    setShopifyImporting(true);
-    try {
-      const response = await fetch('/api/shopify/orders');
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to import orders');
-      }
-
-      alert(`✅ Successfully imported ${data.imported} orders out of ${data.total} total orders!`);
-      
-      // Refresh columns to show new cards
-      const res = await fetch('/api/columns');
-      const columnsData = await res.json();
-      setColumns((columnsData || []).map(mapApiColumn));
-    } catch (e: any) {
-      console.error('Shopify import failed', e);
-      alert(`❌ Failed to import orders: ${e.message}`);
-    } finally {
-      setShopifyImporting(false);
     }
   };
 
@@ -2015,21 +1985,6 @@ export default function App() {
           }
         ),
       }))
-    : columns;
-
-  // Archive search filtering
-  const filteredColumns = searchQuery.trim()
-    ? columns.map((col) => ({
-        ...col,
-        cards: col.cards.filter(
-          (card) => {
-            const query = searchQuery.toLowerCase().trim();
-            const orderNum = String(card.orderNumber || '').toLowerCase().trim();
-            const custName = String(card.customerName || '').toLowerCase().trim();
-            return orderNum.includes(query) || custName.includes(query);
-          }
-        ),
-      })).filter((col) => col.cards.length > 0)
     : columns;
 
   // Render archived cards as a list (Trello style)

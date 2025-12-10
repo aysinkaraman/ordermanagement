@@ -5,7 +5,6 @@ import {
   DndContext,
   DragEndEvent,
   DragOverlay,
-  closestCorners,
   DragStartEvent,
   DragOverEvent,
   pointerWithin,
@@ -85,7 +84,6 @@ export const Board: React.FC<BoardProps> = ({ initialColumns }) => {
 
       setColumns(prevColumns => {
         const activeCards = activeColumn.cards;
-        const overCards = overColumn.cards;
         const activeCard = activeCards.find(card => card.id === activeId);
         
         if (!activeCard) return prevColumns;
