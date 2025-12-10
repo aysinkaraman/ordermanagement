@@ -3,14 +3,39 @@ import { prisma } from '@/lib/prisma';
 import { SHOPIFY_CONFIG, SHOPIFY_ORDER_STATUS_MAP } from '@/lib/shopify';
 import { getUserIdFromRequest } from '@/lib/auth';
 
-// GET - Fetch orders from Shopify
-export async function GET(request: NextRequest) {
+// POST - Fetch orders from Shopify and import to board
+export async function POST(request: NextRequest) {
   try {
     const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const boardId = searchParams.get('boardId');
+    
+    if (!boardId) {
+      return NextResponse.json({ error: 'Board ID required' }, { status: 400 });
+    }
+
+    // Verify user has access to board
+    const board = await prisma.board.findFirst({
+      where: {
+        id: boardId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      }
+    });
+
+    if (!board) {
+      return NextResponse.json({ error: 'Board not found or access denied' }, { status: 403 });
+    }
     
     if (!SHOPIFY_CONFIG.shopName || !SHOPIFY_CONFIG.accessToken) {
       return NextResponse.json(
-        { error: 'Shopify credentials not configured' },
+        { error: 'Shopify credentials not configured. Please set SHOPIFY_SHOP_NAME and SHOPIFY_ACCESS_TOKEN in environment variables.' },
         { status: 400 }
       );
     }
@@ -33,8 +58,9 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     const orders = data.orders || [];
 
-    // Get or create columns
+    // Get or create columns for this board
     const columns = await prisma.column.findMany({
+      where: { boardId },
       orderBy: { order: 'asc' },
     });
 
@@ -49,7 +75,7 @@ export async function GET(request: NextRequest) {
           data: {
             title: colName,
             order: maxOrder + 1,
-            ...(userId && { userId }),
+            boardId,
           },
         });
         columnMap.set(colName, newCol.id);
@@ -112,7 +138,6 @@ ${order.shipping_address.country || ''}
           title: `🛍️ Order #${order.order_number}`,
           description: orderDetails,
           order: (maxOrderCard?.order ?? -1) + 1,
-          ...(userId && { userId }),
         },
       });
 
@@ -121,7 +146,7 @@ ${order.shipping_address.country || ''}
         data: {
           cardId: card.id,
           message: `Order imported from Shopify`,
-          ...(userId && { userId }),
+          userId,
         },
       });
 
@@ -142,106 +167,6 @@ ${order.shipping_address.country || ''}
     console.error('Shopify import error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to import orders' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST - Webhook endpoint for new orders
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const order = body;
-
-    // Verify webhook (in production, verify HMAC signature)
-    // const hmac = request.headers.get('X-Shopify-Hmac-Sha256');
-    
-    // Get or create column
-    const orderStatus = order.financial_status || 'pending';
-    const columnName = SHOPIFY_ORDER_STATUS_MAP[orderStatus] || 'To Do';
-    
-    let column = await prisma.column.findFirst({
-      where: { title: columnName },
-    });
-
-    if (!column) {
-      const maxOrder = await prisma.column.findFirst({
-        orderBy: { order: 'desc' },
-      });
-      column = await prisma.column.create({
-        data: {
-          title: columnName,
-          order: (maxOrder?.order ?? -1) + 1,
-        },
-      });
-    }
-
-    // Check if order already exists
-    const existingCard = await prisma.card.findFirst({
-      where: {
-        title: { contains: `#${order.order_number}` },
-      },
-    });
-
-    if (existingCard) {
-      return NextResponse.json({ message: 'Order already exists' });
-    }
-
-    // Create card
-    const maxOrderCard = await prisma.card.findFirst({
-      where: { columnId: column.id },
-      orderBy: { order: 'desc' },
-    });
-
-    const customerName = order.customer 
-      ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()
-      : 'Guest Customer';
-
-    const orderDetails = `
-📦 Order #${order.order_number}
-👤 Customer: ${customerName}
-💰 Total: ${order.currency} ${order.total_price}
-📅 Date: ${new Date(order.created_at).toLocaleDateString()}
-📧 Email: ${order.email || 'N/A'}
-📱 Phone: ${order.phone || 'N/A'}
-
-Items:
-${order.line_items.map((item: any) => `- ${item.quantity}x ${item.name} (${order.currency} ${item.price})`).join('\n')}
-
-Shipping Address:
-${order.shipping_address ? `
-${order.shipping_address.address1 || ''}
-${order.shipping_address.city || ''}, ${order.shipping_address.province || ''} ${order.shipping_address.zip || ''}
-${order.shipping_address.country || ''}
-`.trim() : 'N/A'}
-    `.trim();
-
-    const card = await prisma.card.create({
-      data: {
-        columnId: column.id,
-        title: `🛍️ Order #${order.order_number}`,
-        description: orderDetails,
-        order: (maxOrderCard?.order ?? -1) + 1,
-      },
-    });
-
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        cardId: card.id,
-        message: `Order received from Shopify webhook`,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      cardId: card.id,
-      message: 'Order imported successfully',
-    });
-  } catch (error: any) {
-    console.error('Webhook error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to process webhook' },
       { status: 500 }
     );
   }
