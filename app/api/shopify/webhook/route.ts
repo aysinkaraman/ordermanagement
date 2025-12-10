@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         foundTag = true;
         console.log('⚡ Express order detected - STOPPING here');
         break;
-      } else if (tag === 'ground' || tag === 'ground shipping' || tag === 'shipping') {
+      } else if (tag === 'ground' || tag === 'ground shipping' || tag === 'shipping' || tag === 'free ground shipping') {
         targetColumn = 'Ground';
         foundTag = true;
         console.log('🚚 Ground order detected - STOPPING here');
