@@ -639,11 +639,42 @@ export default function App() {
     }
   };
 
+  // Refresh board data
+  const refreshBoardData = async () => {
+    if (!currentBoardId) return;
+    
+    try {
+      const res = await fetch(`/api/boards/${currentBoardId}`);
+      if (!res.ok) return;
+      
+      const board = await res.json();
+      
+      // Update columns with new data
+      if (board.columns) {
+        const newColumns = board.columns.map(mapApiColumn);
+        setColumns(newColumns);
+      }
+    } catch (e) {
+      console.error('Failed to refresh board', e);
+    }
+  };
+
   // Load current board and teams on mount
   useEffect(() => {
     loadBoards();
     loadTeams();
   }, []);
+
+  // Auto-refresh every 10 seconds when board is active
+  useEffect(() => {
+    if (!currentBoardId) return;
+
+    const interval = setInterval(() => {
+      refreshBoardData();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [currentBoardId]);
 
   const handleArchiveColumn = async (columnId: string | number) => {
     if (!window.confirm('Are you sure you want to archive this list? All cards will be archived too.')) return;
