@@ -344,14 +344,22 @@ export default function App() {
   const handleAddColumn = async () => {
     const name = newColumnName.trim();
     if (!name) return;
+    
+    if (!currentBoardId) {
+      alert('Please select a board first');
+      return;
+    }
+    
     setColumnSaving(true);
     try {
+      console.log('➕ Creating column:', name, 'in board:', currentBoardId);
       const res = await fetch('/api/columns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: name }),
+        body: JSON.stringify({ title: name, boardId: currentBoardId }),
       });
       const created = await res.json();
+      console.log('✅ Column created:', created);
       const mapped = mapApiColumn(created);
       setColumns((prev) => [...prev, mapped]);
       setNewColumnName('');
@@ -628,11 +636,21 @@ export default function App() {
     try {
       const res = await fetch('/api/boards');
       const data = await res.json();
+      console.log('📋 Loaded boards:', data?.map((b: any) => b.title));
       setBoards(data || []);
+      
+      // Only set first board if no board is selected yet
       if (data && data.length > 0 && !currentBoardId) {
-        setCurrentBoardId(data[0].id);
-        setBoardTitle(data[0].title || 'Falcon Board');
-        loadBoardMembers(data[0].id);
+        console.log('📌 Setting first board as current:', data[0].title);
+        const firstBoard = data[0];
+        setCurrentBoardId(firstBoard.id);
+        setBoardTitle(firstBoard.title || 'Falcon Board');
+        loadBoardMembers(firstBoard.id);
+        
+        // Load board columns
+        if (firstBoard.columns) {
+          setColumns(firstBoard.columns.map(mapApiColumn));
+        }
       }
     } catch (e) {
       console.error('Failed to load boards', e);
@@ -641,18 +659,28 @@ export default function App() {
 
   // Refresh board data
   const refreshBoardData = async () => {
-    if (!currentBoardId) return;
+    if (!currentBoardId) {
+      console.log('⚠️ No currentBoardId, skipping refresh');
+      return;
+    }
     
     try {
+      console.log('🔄 Refreshing board:', currentBoardId);
       const res = await fetch(`/api/boards/${currentBoardId}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.error('Failed to fetch board:', res.status);
+        return;
+      }
       
       const board = await res.json();
+      console.log('✅ Board data received:', board.title, '- Columns:', board.columns?.length);
       
-      // Update columns with new data
-      if (board.columns) {
+      // Only update if we're still on the same board
+      if (board.id === currentBoardId && board.columns) {
         const newColumns = board.columns.map(mapApiColumn);
         setColumns(newColumns);
+      } else {
+        console.log('⚠️ Board ID mismatch, not updating');
       }
     } catch (e) {
       console.error('Failed to refresh board', e);
@@ -3081,19 +3109,27 @@ export default function App() {
               <div
                 key={board.id}
                 onClick={async () => {
-                  setCurrentBoardId(board.id);
-                  setBoardTitle(board.title || 'Falcon Board');
-                  loadBoardMembers(board.id);
-                  setShowBoardSelector(false);
+                  console.log('🔀 Switching to board:', board.title, board.id);
                   
-                  // Load board data without full page reload
+                  // Load board data first
                   try {
                     const res = await fetch(`/api/boards/${board.id}`);
                     if (res.ok) {
                       const boardData = await res.json();
+                      console.log('📊 Board data loaded:', boardData.title, '- Columns:', boardData.columns?.length);
+                      
+                      // Update all state together
+                      setCurrentBoardId(board.id);
+                      setBoardTitle(board.title || 'Falcon Board');
+                      
                       if (boardData.columns) {
                         setColumns(boardData.columns.map(mapApiColumn));
+                      } else {
+                        setColumns([]);
                       }
+                      
+                      loadBoardMembers(board.id);
+                      setShowBoardSelector(false);
                     }
                   } catch (e) {
                     console.error('Failed to load board', e);
