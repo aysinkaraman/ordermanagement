@@ -458,8 +458,8 @@ export default function App() {
       setShareEmail('');
       if (boardId) loadBoardMembers(boardId);
     } catch (e: any) {
-      console.error('Share failed', e);
-      alert(`❌ ${e.message}`);
+      console.error('Share board error:', e);
+      alert(`❌ ${e.message || 'Failed to add member'}`);
     } finally {
       setSharingLoading(false);
     }
@@ -531,11 +531,17 @@ export default function App() {
     }
 
     try {
-      await fetch(`/api/teams/${teamId}/members`, {
+      const response = await fetch(`/api/teams/${teamId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: teamEmail, role: teamMemberRole }),
       });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add member');
+      }
+      
       alert(`✅ Member added to team`);
       setTeamEmail('');
       if (selectedTeam?.id === teamId) {
@@ -543,7 +549,8 @@ export default function App() {
         setSelectedTeam(await res.json());
       }
     } catch (e: any) {
-      alert(`❌ Failed to add member`);
+      console.error('Add team member error:', e);
+      alert(`❌ ${e.message || 'Failed to add member'}`);
     }
   };
 
