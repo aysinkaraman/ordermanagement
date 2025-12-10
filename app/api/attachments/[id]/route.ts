@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function DELETE(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -42,7 +42,7 @@ export async function DELETE(
 }
 
 export async function PATCH(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {

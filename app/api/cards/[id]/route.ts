@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 
 // GET card details
 export async function GET(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -29,7 +29,7 @@ export async function GET(
 
 // PATCH update card
 export async function PATCH(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -96,7 +96,7 @@ export async function PATCH(
 
 // DELETE card (archive)
 export async function DELETE(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
