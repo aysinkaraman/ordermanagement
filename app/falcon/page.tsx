@@ -187,6 +187,8 @@ export default function App() {
   const [boardMembers, setBoardMembers] = useState<any[]>([]);
   const [sharingLoading, setSharingLoading] = useState(false);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
+  const [boards, setBoards] = useState<any[]>([]);
+  const [showBoardSelector, setShowBoardSelector] = useState(false);
   
   // Teams
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -582,21 +584,26 @@ export default function App() {
     }
   };
 
+  // Load boards list
+  const loadBoards = async () => {
+    try {
+      const res = await fetch('/api/boards');
+      const data = await res.json();
+      setBoards(data || []);
+      if (data && data.length > 0 && !currentBoardId) {
+        setCurrentBoardId(data[0].id);
+        setBoardTitle(data[0].title || 'Falcon Board');
+        loadBoardMembers(data[0].id);
+      }
+    } catch (e) {
+      console.error('Failed to load boards', e);
+    }
+  };
+
   // Load current board and teams on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/boards');
-        const boards = await res.json();
-        if (boards && boards.length > 0) {
-          setCurrentBoardId(boards[0].id);
-          loadBoardMembers(boards[0].id);
-        }
-        loadTeams();
-      } catch (e) {
-        console.error('Failed to load board', e);
-      }
-    })();
+    loadBoards();
+    loadTeams();
   }, []);
 
   const handleArchiveColumn = async (columnId: string | number) => {
@@ -1966,6 +1973,27 @@ export default function App() {
           🏢 Teams
         </button>
 
+        {/* Board Selector */}
+        <button
+          onClick={() => setShowBoardSelector(!showBoardSelector)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'rgba(255, 255, 255, 0.2)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Switch between boards"
+        >
+          📋 My Boards ({boards.length})
+        </button>
+
         {/* Share Board */}
         <button
           onClick={() => setShowShareModal(!showShareModal)}
@@ -2863,10 +2891,113 @@ export default function App() {
       {renderArchiveDrawer()}
       {renderThemePicker()}
       {renderProfileModal()}
+      {renderBoardSelector()}
       {renderShareModal()}
       {renderTeamModal()}
     </div>
   );
+
+  function renderBoardSelector() {
+    if (!showBoardSelector) return null;
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}
+        onClick={() => setShowBoardSelector(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 600,
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>📋 My Boards</h2>
+            <button onClick={() => setShowBoardSelector(false)} style={{ ...iconBtnStyle, fontSize: 20 }}>✕</button>
+          </div>
+
+          {/* Boards List */}
+          <div style={{ display: 'grid', gap: 12 }}>
+            {boards.map((board) => (
+              <div
+                key={board.id}
+                onClick={() => {
+                  setCurrentBoardId(board.id);
+                  setBoardTitle(board.title || 'Falcon Board');
+                  loadBoardMembers(board.id);
+                  setShowBoardSelector(false);
+                  // Reload board data
+                  window.location.reload();
+                }}
+                style={{
+                  padding: 16,
+                  borderRadius: 8,
+                  border: currentBoardId === board.id ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                  background: currentBoardId === board.id ? '#fef3c7' : '#f9fafb',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (currentBoardId !== board.id) {
+                    e.currentTarget.style.background = '#f3f4f6';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentBoardId !== board.id) {
+                    e.currentTarget.style.background = '#f9fafb';
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 8 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
+                    {board.title || 'Untitled Board'}
+                  </h3>
+                  {currentBoardId === board.id && (
+                    <span style={{ 
+                      background: primaryColor, 
+                      color: '#fff', 
+                      padding: '2px 8px', 
+                      borderRadius: 4, 
+                      fontSize: 11, 
+                      fontWeight: 600 
+                    }}>
+                      Active
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span>📊 {board._count?.columns || 0} lists</span>
+                  <span>👥 {board._count?.members || 0} members</span>
+                  <span>🗓️ Created {new Date(board.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {boards.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+              <p style={{ fontSize: 14 }}>No boards yet. Create your first board!</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   function renderShareModal() {
     if (!showShareModal) return null;
