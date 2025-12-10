@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     } else if (tags.includes('ground') || tags.includes('shipping')) {
       targetColumn = 'Ground';
       console.log('🚚 Ground order detected from tag');
-    } else if (tags.includes('pickup')) {
+    } else if (tags.includes('pickup') || tags.includes('shop location')) {
       targetColumn = 'Pickup';
       console.log('📍 Pickup order detected from tag');
     }
