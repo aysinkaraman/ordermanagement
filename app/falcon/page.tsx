@@ -180,8 +180,13 @@ export default function App() {
   const [profileAvatar, setProfileAvatar] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   
-  // Shopify import
-  const [shopifyImporting, setShopifyImporting] = useState(false);
+  // Board sharing
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareRole, setShareRole] = useState('member');
+  const [boardMembers, setBoardMembers] = useState<any[]>([]);
+  const [sharingLoading, setSharingLoading] = useState(false);
+  const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   
   const themePresets = [
     { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
@@ -407,33 +412,87 @@ export default function App() {
     }
   };
 
-  const handleShopifyDemoImport = async () => {
-    if (!window.confirm('Import 5 demo Shopify orders for testing? 📦')) {
+  const handleShareBoard = async () => {
+    if (!shareEmail.trim()) {
+      alert('Please enter an email address');
       return;
     }
 
-    setShopifyImporting(true);
+    setSharingLoading(true);
     try {
-      const response = await fetch('/api/shopify/demo', { method: 'POST' });
+      // First, ensure we have a board - create one if needed
+      let boardId = currentBoardId;
+      if (!boardId) {
+        const boardRes = await fetch('/api/boards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'My Kanban Board', isPublic: false }),
+        });
+        const board = await boardRes.json();
+        boardId = board.id;
+        setCurrentBoardId(boardId);
+      }
+
+      const response = await fetch(`/api/boards/${boardId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: shareEmail, role: shareRole }),
+      });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to import demo orders');
+        throw new Error(data.error || 'Failed to add member');
       }
 
-      alert(`🎉 ${data.message}\n\nImported: ${data.imported}/${data.total} orders`);
-      
-      // Refresh columns to show new cards
-      const res = await fetch('/api/columns');
-      const columnsData = await res.json();
-      setColumns((columnsData || []).map(mapApiColumn));
+      alert(`✅ Successfully added ${shareEmail} to your board!`);
+      setShareEmail('');
+      if (boardId) loadBoardMembers(boardId);
     } catch (e: any) {
-      console.error('Demo import failed', e);
-      alert(`❌ Failed to import demo orders: ${e.message}`);
+      console.error('Share failed', e);
+      alert(`❌ ${e.message}`);
     } finally {
-      setShopifyImporting(false);
+      setSharingLoading(false);
     }
   };
+
+  const loadBoardMembers = async (boardId: string) => {
+    try {
+      const response = await fetch(`/api/boards/${boardId}/members`);
+      const data = await response.json();
+      setBoardMembers(data);
+    } catch (e) {
+      console.error('Failed to load members', e);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('Remove this member from the board?')) return;
+    if (!currentBoardId) return;
+
+    try {
+      await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, { method: 'DELETE' });
+      alert('✅ Member removed');
+      loadBoardMembers(currentBoardId);
+    } catch (e: any) {
+      alert('❌ Failed to remove member');
+    }
+  };
+
+  // Load current board on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/boards');
+        const boards = await res.json();
+        if (boards && boards.length > 0) {
+          setCurrentBoardId(boards[0].id);
+          loadBoardMembers(boards[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load board', e);
+      }
+    })();
+  }, []);
 
   const handleArchiveColumn = async (columnId: string | number) => {
     if (!window.confirm('Are you sure you want to archive this list? All cards will be archived too.')) return;
@@ -1781,26 +1840,25 @@ export default function App() {
           return null;
         })()}
 
-        {/* Shopify Import */}
+        {/* Share Board */}
         <button
-          onClick={handleShopifyDemoImport}
-          disabled={shopifyImporting}
+          onClick={() => setShowShareModal(!showShareModal)}
           style={{
             padding: '8px 16px',
             borderRadius: 6,
             border: 'none',
-            background: shopifyImporting ? 'rgba(255,255,255,0.1)' : 'rgba(34, 197, 94, 0.9)',
+            background: 'rgba(59, 130, 246, 0.9)',
             color: '#fff',
-            cursor: shopifyImporting ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             fontSize: 13,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
           }}
-          title="Import demo Shopify orders (for testing)"
+          title="Share this board with team members"
         >
-          🛍️ {shopifyImporting ? 'Importing...' : 'Demo Orders'}
+          👥 Share Board
         </button>
 
         <button
@@ -2679,6 +2737,179 @@ export default function App() {
       {renderArchiveDrawer()}
       {renderThemePicker()}
       {renderProfileModal()}
+      {renderShareModal()}
     </div>
   );
+
+  function renderShareModal() {
+    if (!showShareModal) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+      }}
+      onClick={() => setShowShareModal(false)}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 12,
+          padding: 24,
+          width: '90%',
+          maxWidth: 500,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>👥 Share Board</h2>
+          <button onClick={() => setShowShareModal(false)} style={{ ...iconBtnStyle, fontSize: 20 }}>✕</button>
+        </div>
+
+        {/* Add Member Form */}
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#333' }}>
+            Add Member by Email
+          </label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              type="email"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              placeholder="user@example.com"
+              style={{ ...inputStyle, flex: 1 }}
+              onKeyDown={(e) => e.key === 'Enter' && handleShareBoard()}
+            />
+            <select
+              value={shareRole}
+              onChange={(e) => setShareRole(e.target.value)}
+              style={{ ...inputStyle, width: 120 }}
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button
+            onClick={handleShareBoard}
+            disabled={sharingLoading || !shareEmail.trim()}
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: 8,
+              border: 'none',
+              background: sharingLoading || !shareEmail.trim() ? '#ccc' : primaryColor,
+              color: '#fff',
+              cursor: sharingLoading || !shareEmail.trim() ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            {sharingLoading ? 'Adding...' : '➕ Add Member'}
+          </button>
+        </div>
+
+        {/* Members List */}
+        <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#333' }}>
+            Board Members ({boardMembers.length})
+          </h3>
+          {boardMembers.length === 0 ? (
+            <div style={{ padding: 16, textAlign: 'center', color: '#999', fontSize: 13 }}>
+              No members yet. Add someone to collaborate!
+            </div>
+          ) : (
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {boardMembers.map((member) => (
+                <div
+                  key={member.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 12,
+                    background: '#f9f9f9',
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        background: primaryColor,
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {member.user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>{member.user.name}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>{member.user.email}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: '4px 8px',
+                        background: '#e5e7eb',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {member.role}
+                    </span>
+                    {member.role !== 'owner' && (
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: 12,
+                          borderRadius: 4,
+                          border: 'none',
+                          background: '#fee',
+                          color: '#c00',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div style={{ 
+          marginTop: 20, 
+          padding: 12, 
+          background: '#eff6ff', 
+          borderRadius: 8, 
+          fontSize: 13, 
+          color: '#1e40af' 
+        }}>
+          💡 <strong>Tip:</strong> Members can view and edit all cards. Admins can also manage members.
+        </div>
+      </div>
+    </div>
+  );
+  }
 }
