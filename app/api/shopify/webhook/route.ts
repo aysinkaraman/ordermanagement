@@ -74,17 +74,15 @@ export async function POST(request: NextRequest) {
     
     console.log('✅ Final target column:', targetColumn);
 
-    // Get or create the main Shopify board
-    const boardTitle = 'Shopify Orders';
-    
+    // Use the FIRST available board (user's main board)
     let board = await prisma.board.findFirst({
-      where: { title: boardTitle },
-      include: { columns: { orderBy: { order: 'asc' } } }
+      include: { columns: { orderBy: { order: 'asc' } } },
+      orderBy: { createdAt: 'asc' }
     });
 
-    // Create board if doesn't exist
+    // If no board exists at all, create one
     if (!board) {
-      console.log('📋 Creating new board:', boardTitle);
+      console.log('📋 No boards found, creating first board');
       
       // Get first user as owner
       const firstUser = await prisma.user.findFirst();
@@ -94,7 +92,7 @@ export async function POST(request: NextRequest) {
 
       board = await prisma.board.create({
         data: {
-          title: boardTitle,
+          title: 'Falcon Board',
           ownerId: firstUser.id,
           columns: {
             create: DEFAULT_COLUMNS.map((title, index) => ({
@@ -106,6 +104,8 @@ export async function POST(request: NextRequest) {
         include: { columns: { orderBy: { order: 'asc' } } }
       });
     }
+    
+    console.log('📋 Using board:', board.title, '(ID:', board.id, ')');
 
     // Get target column (don't create if missing - user should create manually)
     const column = board.columns.find(c => c.title === targetColumn);
@@ -183,7 +183,7 @@ ${order.shipping_address.country || ''}
     return NextResponse.json({
       success: true,
       cardId: card.id,
-      boardTitle,
+      boardTitle: board.title,
       column: targetColumn,
       message: 'Order imported successfully',
     });

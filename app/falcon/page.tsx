@@ -3080,13 +3080,24 @@ export default function App() {
             {boards.map((board) => (
               <div
                 key={board.id}
-                onClick={() => {
+                onClick={async () => {
                   setCurrentBoardId(board.id);
                   setBoardTitle(board.title || 'Falcon Board');
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
-                  // Reload board data
-                  window.location.reload();
+                  
+                  // Load board data without full page reload
+                  try {
+                    const res = await fetch(`/api/boards/${board.id}`);
+                    if (res.ok) {
+                      const boardData = await res.json();
+                      if (boardData.columns) {
+                        setColumns(boardData.columns.map(mapApiColumn));
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to load board', e);
+                  }
                 }}
                 style={{
                   padding: 16,
