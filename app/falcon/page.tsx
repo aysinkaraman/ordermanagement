@@ -639,17 +639,37 @@ export default function App() {
       console.log('📋 Loaded boards:', data?.map((b: any) => b.title));
       setBoards(data || []);
       
-      // Only set first board if no board is selected yet
-      if (data && data.length > 0 && !currentBoardId) {
-        console.log('📌 Setting first board as current:', data[0].title);
-        const firstBoard = data[0];
-        setCurrentBoardId(firstBoard.id);
-        setBoardTitle(firstBoard.title || 'Falcon Board');
-        loadBoardMembers(firstBoard.id);
+      if (!data || data.length === 0) return;
+      
+      // Try to restore last selected board from localStorage
+      const savedBoardId = typeof window !== 'undefined' ? localStorage.getItem('selectedBoardId') : null;
+      let targetBoard = null;
+      
+      if (savedBoardId) {
+        targetBoard = data.find((b: any) => b.id === savedBoardId);
+        console.log('💾 Restoring saved board:', targetBoard?.title || 'not found');
+      }
+      
+      // Fallback to first board if saved board not found
+      if (!targetBoard) {
+        targetBoard = data[0];
+        console.log('📌 Using first board:', targetBoard.title);
+      }
+      
+      // Only set if no board is currently selected
+      if (!currentBoardId) {
+        setCurrentBoardId(targetBoard.id);
+        setBoardTitle(targetBoard.title || 'Falcon Board');
+        loadBoardMembers(targetBoard.id);
+        
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('selectedBoardId', targetBoard.id);
+        }
         
         // Load board columns
-        if (firstBoard.columns) {
-          setColumns(firstBoard.columns.map(mapApiColumn));
+        if (targetBoard.columns) {
+          setColumns(targetBoard.columns.map(mapApiColumn));
         }
       }
     } catch (e) {
@@ -3121,6 +3141,12 @@ export default function App() {
                       // Update all state together
                       setCurrentBoardId(board.id);
                       setBoardTitle(board.title || 'Falcon Board');
+                      
+                      // Save to localStorage
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('selectedBoardId', board.id);
+                        console.log('💾 Saved board to localStorage:', board.id);
+                      }
                       
                       if (boardData.columns) {
                         setColumns(boardData.columns.map(mapApiColumn));
