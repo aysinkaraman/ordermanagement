@@ -9,7 +9,7 @@ interface CardModalProps {
   card: Card;
   columnId: string;
   onClose: () => void;
-  onSave: (data: { title: string; description: string }) => void;
+  onSave: (data: { title: string; description: string; dueDate?: Date | null; labels?: string[]; coverImage?: string | null }) => void;
 }
 
 export const CardModal: React.FC<CardModalProps> = ({
@@ -20,6 +20,10 @@ export const CardModal: React.FC<CardModalProps> = ({
 }) => {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description || '');
+  const [dueDate, setDueDate] = useState<string>(card.dueDate ? new Date(card.dueDate).toISOString().slice(0, 16) : '');
+  const [labels, setLabels] = useState<string[]>(card.labels || []);
+  const [newLabel, setNewLabel] = useState('');
+  const [coverImage, setCoverImage] = useState<string | null>(card.coverImage || null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -27,6 +31,7 @@ export const CardModal: React.FC<CardModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,7 +72,45 @@ export const CardModal: React.FC<CardModalProps> = ({
   };
 
   const handleSave = async () => {
-    onSave({ title, description });
+    onSave({ 
+      title, 
+      description, 
+      dueDate: dueDate ? new Date(dueDate) : null,
+      labels,
+      coverImage
+    });
+  };
+
+  const handleAddLabel = () => {
+    if (!newLabel.trim() || labels.includes(newLabel.trim())) return;
+    setLabels([...labels, newLabel.trim()]);
+    setNewLabel('');
+  };
+
+  const handleRemoveLabel = (label: string) => {
+    setLabels(labels.filter(l => l !== label));
+  };
+
+  const handleCoverImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setCoverImage(dataUrl);
+      toast.success('Cover image updated!');
+    } catch (error) {
+      toast.error('Failed to upload cover image');
+      console.error(error);
+    } finally {
+      if (coverInputRef.current) {
+        coverInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveCoverImage = () => {
+    setCoverImage(null);
   };
 
   const fileToDataUrl = (file: File) =>
@@ -184,6 +227,94 @@ export const CardModal: React.FC<CardModalProps> = ({
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
             />
+          </div>
+
+          {/* Due Date Section */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              📅 Due Date
+            </label>
+            <input
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Labels Section */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              🏷️ Labels
+            </label>
+            <div className="flex gap-2 mb-2 flex-wrap">
+              {labels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                >
+                  {label}
+                  <button
+                    onClick={() => handleRemoveLabel(label)}
+                    className="text-blue-600 hover:text-blue-800 font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
+                placeholder="Add label..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+              <button
+                onClick={handleAddLabel}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Cover Image Section */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              🖼️ Cover Image
+            </label>
+            {coverImage && (
+              <div className="mb-2 relative">
+                <img
+                  src={coverImage}
+                  alt="Cover"
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+                <button
+                  onClick={handleRemoveCoverImage}
+                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-semibold"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            <input
+              ref={coverInputRef}
+              type="file"
+              onChange={handleCoverImageSelect}
+              accept="image/*"
+              className="hidden"
+              id="cover-upload"
+            />
+            <label
+              htmlFor="cover-upload"
+              className="inline-block px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg transition-colors cursor-pointer"
+            >
+              {coverImage ? 'Change Cover' : 'Add Cover'}
+            </label>
           </div>
 
           {/* Save Button */}

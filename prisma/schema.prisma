@@ -10,15 +10,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Column {
+model User {
   id        String   @id @default(cuid())
-  title     String
-  order     Int
-  cards     Card[]
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  columns     Column[]
+  cards       Card[]
+  comments    Comment[]
+  activities  Activity[]
+
+  @@index([email])
+}
+
+model Column {
+  id         String   @id @default(cuid())
+  title      String
+  order      Int
+  isArchived Boolean  @default(false)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  cards      Card[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   @@index([order])
+  @@index([isArchived])
+  @@index([userId])
 }
 
 model Card {
@@ -28,6 +50,12 @@ model Card {
   title       String
   description String?
   order       Int
+  isArchived  Boolean      @default(false)
+  dueDate     DateTime?
+  labels      String[]     @default([])
+  coverImage  String?
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id])
   comments    Comment[]
   activities  Activity[]
   attachments Attachment[]
@@ -36,6 +64,9 @@ model Card {
 
   @@index([columnId])
   @@index([order])
+  @@index([isArchived])
+  @@index([dueDate])
+  @@index([userId])
 }
 
 model Comment {
@@ -43,9 +74,12 @@ model Comment {
   cardId    String
   card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   text      String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([cardId])
+  @@index([userId])
 }
 
 model Activity {
@@ -53,10 +87,13 @@ model Activity {
   cardId    String
   card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   message   String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([cardId])
   @@index([createdAt])
+  @@index([userId])
 }
 
 model Attachment {

@@ -89,11 +89,13 @@ type Attachment = {
 
 type Activity = {
   id: number;
-  type: 'move';
-  author: string;
-  from: string;
-  to: string;
+  message: string;
   createdAt: string;
+  user?: {
+    id: number;
+    name: string;
+    avatar: string | null;
+  } | null;
 };
 
 type Card = {
@@ -104,6 +106,8 @@ type Card = {
   comments?: Comment[];
   attachments?: Attachment[];
   activities?: Activity[];
+  createdAt?: string;
+  dueDate?: string | null;
 };
 
 type Column = {
@@ -117,7 +121,15 @@ type ColumnSettings = {
   sortDirection?: 'asc' | 'desc';
 };
 
+type User = {
+  id: number;
+  email: string;
+  name: string;
+  avatar: string | null;
+};
+
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -144,7 +156,45 @@ export default function App() {
 
   const [draggingColumnId, setDraggingColumnId] = useState<string | number | null>(null);
   const [openListMenuId, setOpenListMenuId] = useState<string | number | null>(null);
+  const [openSortMenuId, setOpenSortMenuId] = useState<string | number | null>(null);
   const [columnSettings, setColumnSettings] = useState<Record<string | number, ColumnSettings>>({});
+  const [showArchived, setShowArchived] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
+  const [compactView, setCompactView] = useState(false);
+  const [filterLabel, setFilterLabel] = useState<string>('');
+  const [globalSearch, setGlobalSearch] = useState<string>('');
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('FALCON TRANSFERS');
+  const [boardTitle, setBoardTitle] = useState('Falcon Board');
+  const [editingCompanyName, setEditingCompanyName] = useState(false);
+  const [editingBoardTitle, setEditingBoardTitle] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  
+  // Theme customization
+  const [primaryColor, setPrimaryColor] = useState('#D97706');
+  const [secondaryColor, setSecondaryColor] = useState('#92400E');
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  
+  // Profile modal
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  
+  // Shopify import
+  const [shopifyImporting, setShopifyImporting] = useState(false);
+  
+  const themePresets = [
+    { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
+    { name: 'Blue Ocean', primary: '#0284C7', secondary: '#075985' },
+    { name: 'Purple Dream', primary: '#9333EA', secondary: '#6B21A8' },
+    { name: 'Green Forest', primary: '#059669', secondary: '#047857' },
+    { name: 'Red Fire', primary: '#DC2626', secondary: '#991B1B' },
+    { name: 'Pink Sunset', primary: '#DB2777', secondary: '#9F1239' },
+    { name: 'Teal Wave', primary: '#0D9488', secondary: '#115E59' },
+    { name: 'Indigo Night', primary: '#4F46E5', secondary: '#3730A3' },
+  ];
 
   const mapApiAttachment = (apiAtt: any): Attachment => ({
     id: apiAtt.id,
@@ -164,6 +214,8 @@ export default function App() {
     comments: apiCard.comments || [],
     attachments: (apiCard.attachments || []).map(mapApiAttachment),
     activities: apiCard.activities || [],
+    createdAt: apiCard.createdAt,
+    dueDate: apiCard.dueDate,
   });
 
   const mapApiColumn = (apiCol: any): Column => ({
@@ -173,17 +225,45 @@ export default function App() {
   });
 
   const colorPalette = [
-    '#D97706',
-    '#78350F',
-    '#FEF3C7',
-    '#FB923C',
-    '#F59E0B',
-    '#B45309',
-    '#92400E',
-    '#F97316',
-    '#EA580C',
-    '#92400E',
+    '#FF6B6B',
+    '#4ECDC4',
+    '#45B7D1',
+    '#FFA07A',
+    '#98D8C8',
+    '#F7DC6F',
+    '#BB8FCE',
+    '#85C1E2',
+    '#F8B88B',
+    '#FFB6D9',
+    '#B4E7CE',
+    '#DDA0DD',
+    '#90EE90',
   ];
+
+  // Load user from localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setCurrentUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error('Failed to parse user', e);
+      }
+    }
+  }, []);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-menu="list-menu"]') && !target.closest('[data-menu="sort-menu"]')) {
+        setOpenListMenuId(null);
+        setOpenSortMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -191,7 +271,11 @@ export default function App() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/columns');
+        let url = '/api/columns';
+        if (showArchived) {
+          url = `/api/columns?archived=true&mode=${archiveMode}`;
+        }
+        const res = await fetch(url);
         const data = await res.json();
         if (mounted) setColumns((data || []).map(mapApiColumn));
       } catch (e) {
@@ -204,7 +288,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [showArchived, archiveMode]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -280,15 +364,130 @@ export default function App() {
     }
   };
 
-  const handleDeleteColumn = async (columnId: string | number) => {
-    if (!window.confirm('Bu kolonu silmek istiyor musun?')) return;
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+  };
+
+  const handleProfileUpdate = async () => {
+    if (!profileName.trim()) {
+      alert('Name is required');
+      return;
+    }
+    
+    setProfileSaving(true);
+    try {
+      const response = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileName,
+          avatar: profileAvatar,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const updatedUser = await response.json();
+      setCurrentUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setShowProfileModal(false);
+      alert('Profile updated successfully! ✅');
+    } catch (e) {
+      console.error('Profile update failed', e);
+      alert('Failed to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleShopifyImport = async () => {
+    if (!window.confirm('Import orders from Shopify? This will create cards for new orders.')) {
+      return;
+    }
+
+    setShopifyImporting(true);
+    try {
+      const response = await fetch('/api/shopify/orders');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to import orders');
+      }
+
+      alert(`✅ Successfully imported ${data.imported} orders out of ${data.total} total orders!`);
+      
+      // Refresh columns to show new cards
+      const res = await fetch('/api/columns');
+      const columnsData = await res.json();
+      setColumns((columnsData || []).map(mapApiColumn));
+    } catch (e: any) {
+      console.error('Shopify import failed', e);
+      alert(`❌ Failed to import orders: ${e.message}`);
+    } finally {
+      setShopifyImporting(false);
+    }
+  };
+
+  const handleShopifyDemoImport = async () => {
+    if (!window.confirm('Import 5 demo Shopify orders for testing? 📦')) {
+      return;
+    }
+
+    setShopifyImporting(true);
+    try {
+      const response = await fetch('/api/shopify/demo', { method: 'POST' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to import demo orders');
+      }
+
+      alert(`🎉 ${data.message}\n\nImported: ${data.imported}/${data.total} orders`);
+      
+      // Refresh columns to show new cards
+      const res = await fetch('/api/columns');
+      const columnsData = await res.json();
+      setColumns((columnsData || []).map(mapApiColumn));
+    } catch (e: any) {
+      console.error('Demo import failed', e);
+      alert(`❌ Failed to import demo orders: ${e.message}`);
+    } finally {
+      setShopifyImporting(false);
+    }
+  };
+
+  const handleArchiveColumn = async (columnId: string | number) => {
+    if (!window.confirm('Are you sure you want to archive this list? All cards will be archived too.')) return;
     try {
       await fetch(`/api/columns/${columnId}`, { method: 'DELETE' });
       setColumns((prev) => prev.filter((c) => c.id !== columnId));
       if (openListMenuId === columnId) setOpenListMenuId(null);
     } catch (e) {
-      console.error('Delete column failed', e);
-      alert('Kolon silinemedi.');
+      console.error('Archive column failed', e);
+      alert('List could not be archived.');
+    }
+  };
+
+  const handleUnarchiveColumn = async (columnId: string | number) => {
+    try {
+      await fetch(`/api/columns/${columnId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: false }),
+      });
+      setColumns((prev) => prev.filter((c) => c.id !== columnId));
+    } catch (e) {
+      console.error('Unarchive column failed', e);
+      alert('List could not be unarchived.');
     }
   };
 
@@ -324,8 +523,8 @@ export default function App() {
     }
   };
 
-  const handleDeleteCard = async (cardId: string | number, columnId: string | number) => {
-    if (!window.confirm('Bu kartı silmek istiyor musun?')) return;
+  const handleArchiveCard = async (cardId: string | number, columnId: string | number) => {
+    if (!window.confirm('Are you sure you want to archive this card?')) return;
     try {
       await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
       setColumns((prev) =>
@@ -337,8 +536,28 @@ export default function App() {
       );
       if (activeCard && String(activeCard.id) === String(cardId)) setActiveCard(null);
     } catch (e) {
-      console.error('Delete card failed', e);
-      alert('Kart silinemedi.');
+      console.error('Archive card failed', e);
+      alert('Card could not be archived.');
+    }
+  };
+
+  const handleUnarchiveCard = async (cardId: string | number, columnId: string | number) => {
+    try {
+      await fetch(`/api/cards/${cardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: false }),
+      });
+      setColumns((prev) =>
+        prev.map((c) =>
+          c.id === columnId
+            ? { ...c, cards: (c.cards || []).filter((card) => card.id !== cardId) }
+            : c
+        )
+      );
+    } catch (e) {
+      console.error('Unarchive card failed', e);
+      alert('Card could not be unarchived.');
     }
   };
 
@@ -485,11 +704,13 @@ export default function App() {
 
       const activity: Activity = {
         id: Date.now(),
-        type: 'move',
-        author: CURRENT_USER,
-        from: fromCol.name,
-        to: toCol.name,
+        message: `Card moved from "${fromCol.name}" to "${toCol.name}"`,
         createdAt: new Date().toISOString(),
+        user: currentUser ? {
+          id: currentUser.id,
+          name: currentUser.name,
+          avatar: currentUser.avatar || null,
+        } : null,
       };
 
       const movedCard: Card = {
@@ -551,27 +772,40 @@ export default function App() {
   };
 
   // List Actions
-  const sortColumnCards = (columnId: string | number, direction: 'asc' | 'desc') => {
+  const sortColumnCards = (columnId: string | number, sortType: 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest') => {
     setColumns((prev) =>
       prev.map((col) => {
         if (col.id !== columnId) return col;
         const sorted = [...(col.cards || [])].sort((a, b) => {
-          const aNum = parseInt(a.orderNumber, 10);
-          const bNum = parseInt(b.orderNumber, 10);
-          const aIsNum = !isNaN(aNum);
-          const bIsNum = !isNaN(bNum);
-          if (aIsNum && bIsNum) return direction === 'asc' ? aNum - bNum : bNum - aNum;
-          return direction === 'asc'
-            ? String(a.orderNumber).localeCompare(String(b.orderNumber))
-            : String(b.orderNumber).localeCompare(String(a.orderNumber));
+          switch (sortType) {
+            case 'name-asc':
+            case 'name-desc': {
+              // Sort by card name (orderNumber)
+              const aNum = parseInt(a.orderNumber, 10);
+              const bNum = parseInt(b.orderNumber, 10);
+              const aIsNum = !isNaN(aNum);
+              const bIsNum = !isNaN(bNum);
+              if (aIsNum && bIsNum) {
+                return sortType === 'name-asc' ? aNum - bNum : bNum - aNum;
+              }
+              const comparison = String(a.orderNumber).localeCompare(String(b.orderNumber));
+              return sortType === 'name-asc' ? comparison : -comparison;
+            }
+            case 'date-newest':
+            case 'date-oldest': {
+              // Sort by creation date - note: cards don't have createdAt in Card type yet
+              // For now, sort by order which represents creation order
+              return sortType === 'date-newest' 
+                ? (b.id as string).localeCompare(a.id as string)
+                : (a.id as string).localeCompare(b.id as string);
+            }
+            default:
+              return 0;
+          }
         });
         return { ...col, cards: sorted };
       })
     );
-    setColumnSettings((prev) => ({
-      ...prev,
-      [columnId]: { ...(prev[columnId] || {}), sortDirection: direction },
-    }));
     setOpenListMenuId(null);
   };
 
@@ -585,11 +819,26 @@ export default function App() {
   // Render helpers
   const renderCard = (card: Card, columnId: string | number) => {
     const attachmentCount = (card.attachments || []).length;
+    const cardAttachments = card.attachments || [];
+    
+    // Collect card labels for display
+    const cardLabels: string[] = [];
+    cardAttachments.forEach((att: any) => {
+      if (att.labels && Array.isArray(att.labels)) {
+        att.labels.forEach((l: string) => {
+          if (!cardLabels.includes(l)) cardLabels.push(l);
+        });
+      }
+    });
+    
     return (
       <div
         key={card.id}
         draggable
-        onDragStart={() => handleCardDragStart(card.id, columnId)}
+        onDragStart={(e) => {
+          e.stopPropagation();
+          handleCardDragStart(card.id, columnId);
+        }}
         onDragEnd={handleCardDragEnd}
         onClick={(e) => {
           const target = e.target as HTMLElement;
@@ -597,30 +846,61 @@ export default function App() {
           openCardModal(card);
         }}
         style={{
-          background: '#f2f0ff',
-          border: '1px solid #d8d3ff',
+          background: globalSearch ? '#FEF3C7' : '#f2f0ff',
+          border: globalSearch ? `2px solid ${primaryColor}` : '1px solid #d8d3ff',
           borderRadius: 8,
-          padding: '10px 12px',
-          marginBottom: 8,
+          padding: compactView ? '6px 8px' : '10px 12px',
+          marginBottom: compactView ? 4 : 8,
           cursor: 'grab',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+          boxShadow: globalSearch ? '0 2px 8px rgba(217, 119, 6, 0.3)' : '0 1px 2px rgba(0,0,0,0.06)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{card.orderNumber}</div>
-          <button
-            data-delete="true"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteCard(card.id, columnId);
-            }}
-            style={iconBtnStyle}
-            title="Sil"
-          >
-            🗑️
-          </button>
+          <div style={{ fontWeight: 600, fontSize: compactView ? 12 : 13 }}>{card.orderNumber}</div>
+          {!showArchived && (
+            <button
+              data-delete="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleArchiveCard(card.id, columnId);
+              }}
+              style={iconBtnStyle}
+              title="Archive"
+            >
+              📂
+            </button>
+          )}
+          {showArchived && (
+            <button
+              data-delete="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUnarchiveCard(card.id, columnId);
+              }}
+              style={iconBtnStyle}
+              title="Restore"
+            >
+              ↩️
+            </button>
+          )}
         </div>
-        {attachmentCount > 0 && (
+        {!compactView && cardLabels.length > 0 && (
+          <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {cardLabels.map(label => (
+              <span key={label} style={{ 
+                fontSize: 10, 
+                padding: '2px 6px', 
+                background: '#e0e7ff', 
+                color: '#4338ca',
+                borderRadius: 4,
+                fontWeight: 500
+              }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
+        {!compactView && attachmentCount > 0 && (
           <div style={{ marginTop: 6, fontSize: 12, color: '#6b6b7a', display: 'flex', alignItems: 'center', gap: 4 }}>
             📎 {attachmentCount}
           </div>
@@ -638,8 +918,6 @@ export default function App() {
     return (
       <div
         key={col.id}
-        draggable
-        onDragStart={() => handleColumnDragStart(col.id)}
         onDragOver={handleColumnDragOver}
         onDrop={(e) => handleColumnDrop(e, col.id)}
         style={{
@@ -652,23 +930,47 @@ export default function App() {
           position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div 
+          draggable={!showArchived}
+          onDragStart={(e) => {
+            if (showArchived) return;
+            e.stopPropagation();
+            handleColumnDragStart(col.id);
+          }}
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: 8,
+            cursor: !showArchived ? 'grab' : 'default'
+          }}
+        >
           <div style={{ fontWeight: 600, fontSize: 14 }}>{col.name}</div>
           <div style={{ display: 'flex', gap: 4 }}>
-            <button style={iconBtnStyle} onClick={() => setOpenListMenuId(isMenuOpen ? null : col.id)} title="List actions">
-              ⋯
-            </button>
-            <button style={iconBtnStyle} onClick={() => handleRenameColumn(col.id, col.name)} title="Yeniden adlandır">
-              ✏️
-            </button>
-            <button style={iconBtnStyle} onClick={() => handleDeleteColumn(col.id)} title="Sil">
-              🗑️
-            </button>
+            {!showArchived && (
+              <>
+                <button style={iconBtnStyle} onClick={() => setOpenListMenuId(isMenuOpen ? null : col.id)} title="List actions">
+                  ⋯
+                </button>
+                <button style={iconBtnStyle} onClick={() => handleRenameColumn(col.id, col.name)} title="Rename">
+                  ✏️
+                </button>
+                <button style={iconBtnStyle} onClick={() => handleArchiveColumn(col.id)} title="Archive list">
+                  📂
+                </button>
+              </>
+            )}
+            {showArchived && (
+              <button style={iconBtnStyle} onClick={() => handleUnarchiveColumn(col.id)} title="Restore list">
+                ↩️
+              </button>
+            )}
           </div>
         </div>
 
         {isMenuOpen && (
           <div
+            data-menu="list-menu"
             style={{
               position: 'absolute',
               top: 36,
@@ -682,12 +984,15 @@ export default function App() {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>List actions</div>
-            <div style={{ fontSize: 12, color: '#555', marginBottom: 4 }}>Sort by</div>
-            <div style={menuItemStyle} onClick={() => sortColumnCards(col.id, 'asc')}>
-              Order number (A → Z)
-            </div>
-            <div style={menuItemStyle} onClick={() => sortColumnCards(col.id, 'desc')}>
-              Order number (Z → A)
+            <div 
+              style={{ ...menuItemStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} 
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenSortMenuId(openSortMenuId === col.id ? null : col.id);
+              }}
+            >
+              Sort by...
+              <span style={{ fontSize: 10 }}>▶</span>
             </div>
             <div style={{ fontSize: 12, color: '#555', margin: '8px 0 4px' }}>Change list color</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
@@ -712,6 +1017,100 @@ export default function App() {
           </div>
         )}
 
+        {openSortMenuId === col.id && (
+          <div
+            data-menu="sort-menu"
+            style={{
+              position: 'absolute',
+              top: 36,
+              right: 220,
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+              padding: 10,
+              width: 220,
+              zIndex: 11,
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Sort list</div>
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'date-newest'); setOpenSortMenuId(null); }}>
+              Date created (newest first)
+            </div>
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'date-oldest'); setOpenSortMenuId(null); }}>
+              Date created (oldest first)
+            </div>
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-asc'); setOpenSortMenuId(null); }}>
+              Card name (alphabetically)
+            </div>
+          </div>
+        )}
+
+        {/* Stats Dashboard */}
+        {!showArchived && (() => {
+          const stats = getColumnStats(col.cards || []);
+          const completionRate = stats.withDueDate > 0 
+            ? ((stats.withDueDate - stats.overdue) / stats.withDueDate) * 100 
+            : 100;
+          
+          return (
+            <div style={{ 
+              background: 'rgba(255,255,255,0.7)', 
+              borderRadius: 6, 
+              padding: 8, 
+              marginBottom: 8,
+              fontSize: 11
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#666', fontWeight: 600 }}>📊 {stats.total} cards</span>
+                {stats.addedToday > 0 && (
+                  <span style={{ color: '#059669', fontWeight: 600 }}>+{stats.addedToday} today</span>
+                )}
+              </div>
+              
+              {stats.overdue > 0 && (
+                <div style={{ 
+                  color: '#DC2626', 
+                  fontWeight: 600,
+                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}>
+                  ⚠️ {stats.overdue} overdue
+                </div>
+              )}
+              
+              {stats.withDueDate > 0 && (
+                <div>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    marginBottom: 2,
+                    color: '#666',
+                    fontSize: 10
+                  }}>
+                    <span>Completion</span>
+                    <span>{Math.round(completionRate)}%</span>
+                  </div>
+                  <div style={{ 
+                    background: '#E5E7EB', 
+                    borderRadius: 4, 
+                    height: 6,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ 
+                      background: completionRate > 75 ? '#059669' : completionRate > 50 ? '#F59E0B' : '#DC2626',
+                      height: '100%',
+                      width: `${completionRate}%`,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         <div
           onDragOver={handleCardDragOver}
           onDrop={(e) => handleCardDrop(e, col.id)}
@@ -724,51 +1123,68 @@ export default function App() {
             overflowY: 'auto',
           }}
         >
-          {(col.cards || []).map((card) => renderCard(card, col.id))}
+          {(col.cards || [])
+            .filter(card => {
+              if (!filterLabel) return true;
+              const cardAttachments = card.attachments || [];
+              const cardLabels: string[] = [];
+              cardAttachments.forEach((att: any) => {
+                if (att.labels && Array.isArray(att.labels)) {
+                  att.labels.forEach((l: string) => {
+                    if (!cardLabels.includes(l)) cardLabels.push(l);
+                  });
+                }
+              });
+              return cardLabels.includes(filterLabel);
+            })
+            .map((card) => renderCard(card, col.id))
+          }
         </div>
 
-        <div style={{ marginTop: 8 }}>
-          {!isAddCardActive ? (
-            <button
-              onClick={() => {
-                setActiveAddColumnId(col.id);
-                setNewCardText('');
-              }}
-              style={addBtnStyle}
-            >
-              + Add a card
-            </button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <input
-                value={newCardText}
-                onChange={(e) => setNewCardText(e.target.value)}
-                placeholder="Örn: 34932"
-                style={inputStyle}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddCard(col.id);
-                  }
+        {!showArchived && (
+          <div style={{ marginTop: 8 }}>
+            {!isAddCardActive ? (
+              <button
+                onClick={() => {
+                  setActiveAddColumnId(col.id);
+                  setNewCardText('');
                 }}
-              />
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button disabled={cardSaving} onClick={() => handleAddCard(col.id)} style={primaryBtnStyle}>
-                  {cardSaving ? 'Kaydediliyor...' : 'Kart ekle'}
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveAddColumnId(null);
-                    setNewCardText('');
+                style={addBtnStyle}
+              >
+                + Add a card
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <input
+                  value={newCardText}
+                  onChange={(e) => setNewCardText(e.target.value)}
+                  placeholder="E.g: 34932"
+                  style={inputStyle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCard(col.id);
+                    }
                   }}
-                  style={secondaryBtnStyle}
-                >
-                  İptal
-                </button>
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button disabled={cardSaving} onClick={() => handleAddCard(col.id)} style={{...primaryBtnStyle, background: primaryColor}}>
+                    {cardSaving ? 'Saving...' : 'Add card'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveAddColumnId(null);
+                      setNewCardText('');
+                    }}
+                    style={secondaryBtnStyle}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -814,18 +1230,44 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 22, fontWeight: 700 }}>
-                {activeCard.orderNumber || 'Kart'}
+                {activeCard.orderNumber || 'Card'}
               </div>
-              <button style={iconBtnStyle} onClick={closeCardModal}>
-                ✕
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!showArchived && (
+                  <button
+                    style={{ ...iconBtnStyle, fontSize: 16 }}
+                    onClick={() => {
+                      handleArchiveCard(activeCard.id, activeCard.columnId);
+                      closeCardModal();
+                    }}
+                    title="Archive card"
+                  >
+                    📂
+                  </button>
+                )}
+                {showArchived && (
+                  <button
+                    style={{ ...iconBtnStyle, fontSize: 16 }}
+                    onClick={() => {
+                      handleUnarchiveCard(activeCard.id, activeCard.columnId);
+                      closeCardModal();
+                    }}
+                    title="Restore card"
+                  >
+                    ↩️
+                  </button>
+                )}
+                <button style={iconBtnStyle} onClick={closeCardModal}>
+                  ✕
+                </button>
+              </div>
             </div>
 
 
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Description</div>
-              {descriptionSaving && <span style={{ fontSize: 12, color: '#6b6b7a' }}>Kaydediliyor…</span>}
+              {descriptionSaving && <span style={{ fontSize: 12, color: '#6b6b7a' }}>Saving…</span>}
             </div>
             <textarea
               value={descriptionDraft}
@@ -843,7 +1285,7 @@ export default function App() {
             />
             <div>
               <button onClick={handleSaveDescription} style={{ ...primaryBtnStyle, padding: '10px 14px' }}>
-                Kaydet
+                Save
               </button>
             </div>
 
@@ -861,7 +1303,7 @@ export default function App() {
             </label>
 
             {attachments.length === 0 ? (
-              <div style={{ color: '#888', fontSize: 13 }}>Henüz dosya yok.</div>
+              <div style={{ color: '#888', fontSize: 13 }}>No files yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {attachments.map((att) => {
@@ -898,7 +1340,7 @@ export default function App() {
                             </a>
                           </div>
                           <div style={{ fontSize: 12, color: '#6b6b7a' }}>
-                            {formatSizeKB(att.size)} · {att.type || 'dosya'} · {formatDate(att.createdAt)}
+                            {formatSizeKB(att.size)} · {att.type || 'file'} · {formatDate(att.createdAt)}
                           </div>
                         </div>
                         <a
@@ -908,7 +1350,7 @@ export default function App() {
                           download={att.name}
                           style={{ ...secondaryBtnStyle, padding: '6px 10px', fontSize: 12 }}
                         >
-                          Aç / İndir
+                          Open / Download
                         </a>
                       </div>
 
@@ -934,7 +1376,7 @@ export default function App() {
                         <textarea
                           value={noteDraft}
                           onChange={(e) => setAttachmentNotes((prev) => ({ ...prev, [att.id]: e.target.value }))}
-                          placeholder="Bu dosyayla ilgili not ekle"
+                          placeholder="Add a note about this file"
                           style={{
                             width: '100%',
                             minHeight: 80,
@@ -951,7 +1393,7 @@ export default function App() {
                             disabled={attachmentSaving === att.id}
                             style={{ ...primaryBtnStyle, padding: '8px 12px', fontSize: 12 }}
                           >
-                            {attachmentSaving === att.id ? 'Kaydediliyor…' : 'Notu kaydet'}
+                            {attachmentSaving === att.id ? 'Saving…' : 'Save note'}
                           </button>
                         </div>
                       </div>
@@ -980,7 +1422,7 @@ export default function App() {
                   }}
                   style={{ ...inputStyle, width: '100%' }}
                 />
-                <button onClick={handleAddComment} style={primaryBtnStyle}>
+                <button onClick={handleAddComment} style={{...primaryBtnStyle, background: primaryColor}}>
                   Add comment
                 </button>
               </div>
@@ -989,7 +1431,7 @@ export default function App() {
             <div>
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Comments</div>
               {comments.length === 0 ? (
-                <div style={{ color: '#888', fontSize: 13 }}>Henüz yorum yok.</div>
+                <div style={{ color: '#888', fontSize: 13 }}>No comments yet.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {comments.map((c) => (
@@ -1006,15 +1448,51 @@ export default function App() {
             <div>
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Activity</div>
               {activities.length === 0 ? (
-                <div style={{ color: '#888', fontSize: 13 }}>Henüz activity yok.</div>
+                <div style={{ color: '#888', fontSize: 13 }}>No activity yet.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {activities.map((a) => (
-                    <div key={a.id} style={{ borderBottom: '1px solid #eee', paddingBottom: 6 }}>
-                      <div style={{ fontSize: 13 }}>
-                        <strong>{a.author}</strong> moved this card from {a.from} to {a.to}
+                    <div key={a.id} style={{ borderBottom: '1px solid #eee', paddingBottom: 8, display: 'flex', gap: 10, alignItems: 'start' }}>
+                      {/* User Avatar */}
+                      <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: a.user?.avatar && a.user.avatar.startsWith('data:')
+                          ? '#fff'
+                          : `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: a.user?.avatar && a.user.avatar.startsWith('data:') ? 0 : 14,
+                        fontWeight: 'bold',
+                        color: '#fff',
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        backgroundImage: a.user?.avatar && a.user.avatar.startsWith('data:')
+                          ? `url(${a.user.avatar})`
+                          : 'none',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}>
+                        {(!a.user?.avatar || !a.user.avatar.startsWith('data:')) && (
+                          a.user?.avatar || a.user?.name.charAt(0).toUpperCase() || '?'
+                        )}
                       </div>
-                      <div style={{ color: '#777', fontSize: 12 }}>{new Date(a.createdAt).toLocaleString()}</div>
+                      
+                      {/* Activity Info */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                          <strong style={{ color: primaryColor }}>
+                            {a.user?.name || 'Unknown User'}
+                          </strong>
+                          {' '}
+                          {a.message}
+                        </div>
+                        <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>
+                          {new Date(a.createdAt).toLocaleString()}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1027,10 +1505,453 @@ export default function App() {
   };
 
   // Render
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCompanyLogo(reader.result as string);
+      localStorage.setItem('companyLogo', reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    if (logoInputRef.current) {
+      logoInputRef.current.value = '';
+    }
+  };
+
+  const handleCompanyNameSave = () => {
+    setEditingCompanyName(false);
+    localStorage.setItem('companyName', companyName);
+  };
+
+  const handleBoardTitleSave = () => {
+    setEditingBoardTitle(false);
+    localStorage.setItem('boardTitle', boardTitle);
+  };
+
+  // Load branding and theme from localStorage
+  useEffect(() => {
+    const savedLogo = localStorage.getItem('companyLogo');
+    const savedCompanyName = localStorage.getItem('companyName');
+    const savedBoardTitle = localStorage.getItem('boardTitle');
+    const savedPrimaryColor = localStorage.getItem('primaryColor');
+    const savedSecondaryColor = localStorage.getItem('secondaryColor');
+    
+    if (savedLogo) setCompanyLogo(savedLogo);
+    if (savedCompanyName) setCompanyName(savedCompanyName);
+    if (savedBoardTitle) setBoardTitle(savedBoardTitle);
+    if (savedPrimaryColor) setPrimaryColor(savedPrimaryColor);
+    if (savedSecondaryColor) setSecondaryColor(savedSecondaryColor);
+  }, []);
+  
+  const applyTheme = (primary: string, secondary: string) => {
+    setPrimaryColor(primary);
+    setSecondaryColor(secondary);
+    localStorage.setItem('primaryColor', primary);
+    localStorage.setItem('secondaryColor', secondary);
+  };
+
+  // Calculate stats for a column
+  const getColumnStats = (cards: Card[]) => {
+    const total = cards.length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const addedToday = cards.filter(card => {
+      if (!card.createdAt) return false;
+      const cardDate = new Date(card.createdAt);
+      cardDate.setHours(0, 0, 0, 0);
+      return cardDate.getTime() === today.getTime();
+    }).length;
+    
+    const overdue = cards.filter(card => {
+      if (!card.dueDate) return false;
+      return new Date(card.dueDate) < new Date();
+    }).length;
+    
+    const withDueDate = cards.filter(card => card.dueDate).length;
+    
+    return { total, addedToday, overdue, withDueDate };
+  };
+
   const header = (
-    <div style={{ padding: '16px 24px', background: '#0f3c8c', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-      <div style={{ fontSize: 12, letterSpacing: 1.4, opacity: 0.85 }}>FALCON TRANSFERS</div>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>Falcon Board</div>
+    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        {/* Company Logo */}
+        <div 
+          onClick={() => logoInputRef.current?.click()}
+          style={{ 
+            width: 60, 
+            height: 60, 
+            background: companyLogo ? 'transparent' : 'rgba(255,255,255,0.2)', 
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            border: '2px dashed rgba(255,255,255,0.4)',
+            overflow: 'hidden',
+            flexShrink: 0
+          }}
+          title="Click to upload logo"
+        >
+          {companyLogo ? (
+            <img src={companyLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ fontSize: 24 }}>🏢</span>
+          )}
+        </div>
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleLogoUpload}
+          style={{ display: 'none' }}
+        />
+
+        {/* Company Name & Board Title */}
+        <div>
+          {editingCompanyName ? (
+            <input
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value.toUpperCase())}
+              onBlur={handleCompanyNameSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCompanyNameSave();
+                if (e.key === 'Escape') {
+                  setCompanyName(localStorage.getItem('companyName') || 'FALCON TRANSFERS');
+                  setEditingCompanyName(false);
+                }
+              }}
+              autoFocus
+              style={{ 
+                fontSize: 12, 
+                letterSpacing: 1.4, 
+                background: 'rgba(255,255,255,0.2)',
+                border: '1px solid rgba(255,255,255,0.4)',
+                borderRadius: 4,
+                padding: '4px 8px',
+                color: '#FEF3C7',
+                outline: 'none',
+                fontWeight: 600
+              }}
+            />
+          ) : (
+            <div 
+              onClick={() => setEditingCompanyName(true)}
+              style={{ 
+                fontSize: 12, 
+                letterSpacing: 1.4, 
+                opacity: 0.95, 
+                color: '#FEF3C7',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: 4,
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              title="Click to edit"
+            >
+              {companyName}
+            </div>
+          )}
+          
+          {editingBoardTitle ? (
+            <input
+              type="text"
+              value={boardTitle}
+              onChange={(e) => setBoardTitle(e.target.value)}
+              onBlur={handleBoardTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleBoardTitleSave();
+                if (e.key === 'Escape') {
+                  setBoardTitle(localStorage.getItem('boardTitle') || 'Falcon Board');
+                  setEditingBoardTitle(false);
+                }
+              }}
+              autoFocus
+              style={{ 
+                fontSize: 22, 
+                fontWeight: 700,
+                background: 'rgba(255,255,255,0.2)',
+                border: '1px solid rgba(255,255,255,0.4)',
+                borderRadius: 4,
+                padding: '4px 8px',
+                color: '#FFFFFF',
+                outline: 'none'
+              }}
+            />
+          ) : (
+            <div 
+              onClick={() => setEditingBoardTitle(true)}
+              style={{ 
+                fontSize: 22, 
+                fontWeight: 700, 
+                color: '#FFFFFF',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: 4,
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              title="Click to edit"
+            >
+              {boardTitle}
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        {/* Global Search */}
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            placeholder="🔍 Search cards..."
+            style={{
+              padding: '8px 12px 8px 32px',
+              borderRadius: 6,
+              border: 'none',
+              background: 'rgba(255,255,255,0.2)',
+              color: '#fff',
+              fontSize: 13,
+              outline: 'none',
+              width: globalSearch ? '250px' : '180px',
+              transition: 'width 0.3s ease, background 0.2s',
+            }}
+            onFocus={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onBlur={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          />
+          {globalSearch && (
+            <button
+              onClick={() => setGlobalSearch('')}
+              style={{
+                position: 'absolute',
+                right: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 16,
+                padding: 0,
+              }}
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Compact View Toggle */}
+        <button
+          onClick={() => setCompactView(!compactView)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: compactView ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+            color: compactView ? '#92400E' : '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title={compactView ? 'Comfortable View' : 'Compact View'}
+        >
+          {compactView ? '📋 Compact' : '📝 Comfortable'}
+        </button>
+
+        {/* Label Filter */}
+        {!showArchived && (() => {
+          const allLabels = new Set<string>();
+          columns.forEach(col => {
+            col.cards.forEach(card => {
+              const cardAttachments = card.attachments || [];
+              cardAttachments.forEach((att: any) => {
+                if (att.labels && Array.isArray(att.labels)) {
+                  att.labels.forEach((l: string) => allLabels.add(l));
+                }
+              });
+            });
+          });
+          
+          if (allLabels.size > 0) {
+            return (
+              <select
+                value={filterLabel}
+                onChange={(e) => setFilterLabel(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: filterLabel ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+                  color: filterLabel ? '#92400E' : '#fff',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <option value="" style={{ color: '#333' }}>🏷️ All Labels</option>
+                {Array.from(allLabels).map(label => (
+                  <option key={label} value={label} style={{ color: '#333' }}>{label}</option>
+                ))}
+              </select>
+            );
+          }
+          return null;
+        })()}
+
+        {/* Shopify Import */}
+        <button
+          onClick={handleShopifyDemoImport}
+          disabled={shopifyImporting}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: shopifyImporting ? 'rgba(255,255,255,0.1)' : 'rgba(34, 197, 94, 0.9)',
+            color: '#fff',
+            cursor: shopifyImporting ? 'not-allowed' : 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Import demo Shopify orders (for testing)"
+        >
+          🛍️ {shopifyImporting ? 'Importing...' : 'Demo Orders'}
+        </button>
+
+        <button
+          onClick={() => setShowThemePicker(!showThemePicker)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: showThemePicker ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+            color: showThemePicker ? '#92400E' : '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Customize Theme"
+        >
+          🎨 Theme
+        </button>
+
+        <button
+          onClick={() => {
+            setShowArchived(!showArchived);
+            setSearchQuery('');
+            setArchiveMode('cards');
+          }}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: showArchived ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+            color: showArchived ? '#92400E' : '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          📂 Archived Items
+        </button>
+
+        {/* User Profile & Logout */}
+        {currentUser && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 12, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
+            <div 
+              onClick={() => {
+                setProfileName(currentUser.name);
+                setProfileAvatar(currentUser.avatar || '');
+                setShowProfileModal(true);
+              }}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 8,
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: 6,
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              title="Click to edit profile"
+            >
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                background: currentUser.avatar && currentUser.avatar.startsWith('data:')
+                  ? '#fff'
+                  : 'rgba(255,255,255,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: currentUser.avatar && currentUser.avatar.startsWith('data:') ? 0 : 16,
+                fontWeight: 'bold',
+                color: '#fff',
+                border: '2px solid rgba(255,255,255,0.5)',
+                overflow: 'hidden',
+                backgroundImage: currentUser.avatar && currentUser.avatar.startsWith('data:')
+                  ? `url(${currentUser.avatar})`
+                  : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}>
+                {(!currentUser.avatar || !currentUser.avatar.startsWith('data:')) && (currentUser.avatar || currentUser.name.charAt(0).toUpperCase())}
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+                  {currentUser.name}
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.8, color: '#FEF3C7' }}>
+                  {currentUser.email}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: 'none',
+                background: 'rgba(255,255,255,0.2)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+              title="Logout"
+            >
+              🚪 Logout
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1045,11 +1966,11 @@ export default function App() {
         flexShrink: 0,
       }}
     >
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>+ Yeni kolon ekle</div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>+ Create list</div>
       <input
         value={newColumnName}
         onChange={(e) => setNewColumnName(e.target.value)}
-        placeholder="Kolon adı"
+        placeholder="List name"
         style={inputStyle}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1063,25 +1984,746 @@ export default function App() {
         onClick={handleAddColumn}
         style={{ ...primaryBtnStyle, marginTop: 8, width: '100%' }}
       >
-        {columnSaving ? 'Ekleniyor...' : 'Kolon oluştur'}
+        {columnSaving ? 'Creating...' : 'Create list'}
       </button>
     </div>
   );
+
+  // Filter columns and cards based on search query
+  // Global search filtering (for main board)
+  const globalFilteredColumns = globalSearch.trim()
+    ? columns.map((col) => ({
+        ...col,
+        cards: col.cards.filter(
+          (card) => {
+            const query = globalSearch.toLowerCase().trim();
+            const orderNum = String(card.orderNumber || '').toLowerCase().trim();
+            const custName = String(card.customerName || '').toLowerCase().trim();
+            
+            // Search in attachments and comments
+            const hasMatchInAttachments = (card.attachments || []).some(att => 
+              String(att.name || '').toLowerCase().includes(query)
+            );
+            const hasMatchInComments = (card.comments || []).some(comment => 
+              String(comment.text || '').toLowerCase().includes(query)
+            );
+            
+            return orderNum.includes(query) || 
+                   custName.includes(query) || 
+                   hasMatchInAttachments || 
+                   hasMatchInComments;
+          }
+        ),
+      }))
+    : columns;
+
+  // Archive search filtering
+  const filteredColumns = searchQuery.trim()
+    ? columns.map((col) => ({
+        ...col,
+        cards: col.cards.filter(
+          (card) => {
+            const query = searchQuery.toLowerCase().trim();
+            const orderNum = String(card.orderNumber || '').toLowerCase().trim();
+            const custName = String(card.customerName || '').toLowerCase().trim();
+            return orderNum.includes(query) || custName.includes(query);
+          }
+        ),
+      })).filter((col) => col.cards.length > 0)
+    : columns;
+
+  // Render archived cards as a list (Trello style)
+  const renderArchivedView = () => {
+    if (archiveMode === 'lists') {
+      // Show archived lists
+      const archivedLists = columns.filter((col) => searchQuery.trim()
+        ? col.name.toLowerCase().includes(searchQuery.toLowerCase())
+        : true
+      );
+
+      return (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#666' }}>
+            {archivedLists.length} list{archivedLists.length !== 1 ? 's' : ''}
+          </div>
+          {archivedLists.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
+              {searchQuery ? 'No lists match your search' : 'No archived lists'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {archivedLists.map((col) => (
+                <div
+                  key={col.id}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 8,
+                    padding: '16px 20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#333', marginBottom: 4 }}>
+                      {col.name}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#666' }}>
+                      {col.cards.length} card{col.cards.length !== 1 ? 's' : ''} · Archived
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleUnarchiveColumn(col.id)}
+                    style={{
+                      ...secondaryBtnStyle,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                    }}
+                  >
+                    ↩️ Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Show archived cards
+    const allArchivedCards: Array<Card & { columnName: string }> = [];
+    columns.forEach((col) => {
+      col.cards.forEach((card) => {
+        allArchivedCards.push({ ...card, columnName: col.name });
+      });
+    });
+
+    const filtered = searchQuery.trim()
+      ? allArchivedCards.filter((card) => {
+          const query = searchQuery.toLowerCase().trim();
+          const orderNum = String(card.orderNumber || '').toLowerCase().trim();
+          const custName = String(card.customerName || '').toLowerCase().trim();
+          return orderNum.includes(query) || custName.includes(query);
+        })
+      : allArchivedCards;
+
+    return (
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#666' }}>
+          {filtered.length} card{filtered.length !== 1 ? 's' : ''}
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
+            {searchQuery ? 'No cards match your search' : 'No archived cards'}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filtered.map((card) => (
+              <div
+                key={card.id}
+                onClick={() => openCardModal(card)}
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: 8,
+                  padding: '16px 20px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#333', marginBottom: 4 }}>
+                    {card.orderNumber}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#666' }}>
+                    {card.columnName} · Archived
+                  </div>
+                  {card.customerName && (
+                    <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
+                      {card.customerName}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUnarchiveCard(card.id, card.columnId);
+                  }}
+                  style={{
+                    ...secondaryBtnStyle,
+                    padding: '6px 12px',
+                    fontSize: 12,
+                  }}
+                >
+                  ↩️ Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render archive drawer (sidebar)
+  const renderArchiveDrawer = () => {
+    if (!showArchived) return null;
+
+    return (
+      <>
+        {/* Overlay */}
+        <div
+          onClick={() => setShowArchived(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+          }}
+        />
+        {/* Drawer */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '600px',
+            maxWidth: '90vw',
+            background: '#fff',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Header */}
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#333' }}>Archived Items</div>
+            <button
+              onClick={() => setShowArchived(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 24,
+                cursor: 'pointer',
+                color: '#666',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Search and toggle */}
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid #e0e0e0', display: 'flex', gap: 12 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={archiveMode === 'cards' ? 'Search archived cards...' : 'Search archived lists...'}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                borderRadius: 6,
+                border: '1px solid #d0d0d0',
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={() => setArchiveMode(archiveMode === 'cards' ? 'lists' : 'cards')}
+              style={{
+                padding: '10px 16px',
+                borderRadius: 6,
+                border: '1px solid #d0d0d0',
+                background: '#f5f5f5',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Switch to {archiveMode === 'cards' ? 'lists' : 'cards'}
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+            {loading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
+            ) : (
+              renderArchivedView()
+            )}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // Theme Picker Modal
+  const renderThemePicker = () => {
+    if (!showThemePicker) return null;
+    
+    return (
+      <div
+        onClick={() => setShowThemePicker(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: '#fff',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 600,
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#333', margin: 0 }}>🎨 Customize Theme</h2>
+            <button
+              onClick={() => setShowThemePicker(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 24,
+                cursor: 'pointer',
+                color: '#666',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Custom Colors */}
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#555', marginBottom: 12 }}>Custom Colors</h3>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: '#666', display: 'block', marginBottom: 4 }}>Primary Color</label>
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => applyTheme(e.target.value, secondaryColor)}
+                  style={{
+                    width: '100%',
+                    height: 50,
+                    border: '2px solid #ddd',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: '#666', display: 'block', marginBottom: 4 }}>Secondary Color</label>
+                <input
+                  type="color"
+                  value={secondaryColor}
+                  onChange={(e) => applyTheme(primaryColor, e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: 50,
+                    border: '2px solid #ddd',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preset Themes */}
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#555', marginBottom: 12 }}>Preset Themes</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+              {themePresets.map((preset) => (
+                <div
+                  key={preset.name}
+                  onClick={() => applyTheme(preset.primary, preset.secondary)}
+                  style={{
+                    background: `linear-gradient(135deg, ${preset.primary} 0%, ${preset.secondary} 100%)`,
+                    borderRadius: 8,
+                    padding: 16,
+                    cursor: 'pointer',
+                    border: primaryColor === preset.primary && secondaryColor === preset.secondary ? '3px solid #333' : '3px solid transparent',
+                    transition: 'transform 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+                    {preset.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div style={{ marginTop: 24, padding: 16, background: '#f9f9f9', borderRadius: 8 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Preview</h3>
+            <div style={{ 
+              background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+              padding: 16,
+              borderRadius: 8,
+              color: '#fff',
+              textAlign: 'center',
+              fontWeight: 600
+            }}>
+              Your Board Header
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Profile Modal
+  const renderProfileModal = () => {
+    if (!showProfileModal) return null;
+
+    return (
+      <div 
+        onClick={() => setShowProfileModal(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            width: '90%',
+            maxWidth: 500,
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* Header */}
+          <div style={{ 
+            padding: '20px 24px', 
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+            color: '#fff',
+            borderRadius: '16px 16px 0 0',
+          }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>👤 Edit Profile</h2>
+            <button
+              onClick={() => setShowProfileModal(false)}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: '#fff',
+                fontSize: 24,
+                cursor: 'pointer',
+                width: 32,
+                height: 32,
+                borderRadius: 6,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: 24 }}>
+            {/* Current Avatar Preview */}
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                background: profileAvatar && profileAvatar.startsWith('data:') 
+                  ? '#fff' 
+                  : `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: profileAvatar && profileAvatar.startsWith('data:') ? 0 : 48,
+                fontWeight: 'bold',
+                color: '#fff',
+                border: '4px solid #e5e7eb',
+                marginBottom: 12,
+                overflow: 'hidden',
+                backgroundImage: profileAvatar && profileAvatar.startsWith('data:') 
+                  ? `url(${profileAvatar})` 
+                  : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}>
+                {(!profileAvatar || !profileAvatar.startsWith('data:')) && (profileAvatar || profileName.charAt(0).toUpperCase())}
+              </div>
+              <div style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+                Profile Avatar
+              </div>
+              <label
+                style={{
+                  display: 'inline-block',
+                  padding: '8px 16px',
+                  background: primaryColor,
+                  color: '#fff',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                📷 Upload Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 2 * 1024 * 1024) {
+                        alert('File size must be less than 2MB');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setProfileAvatar(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              {profileAvatar && profileAvatar.startsWith('data:') && (
+                <button
+                  onClick={() => setProfileAvatar('')}
+                  style={{
+                    display: 'inline-block',
+                    marginLeft: 8,
+                    padding: '8px 16px',
+                    background: '#ef4444',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  🗑️ Remove
+                </button>
+              )}
+            </div>
+
+            {/* Name Field */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{
+                display: 'block',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#333',
+                marginBottom: 8,
+              }}>
+                Name *
+              </label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Enter your name"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  outline: 'none',
+                }}
+                onFocus={(e) => e.target.style.borderColor = primaryColor}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+              />
+            </div>
+
+            {/* Avatar Field - Only show if no photo uploaded */}
+            {(!profileAvatar || !profileAvatar.startsWith('data:')) && (
+              <>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: '#333',
+                    marginBottom: 8,
+                  }}>
+                    Avatar (Emoji)
+                  </label>
+                  <input
+                    type="text"
+                    value={profileAvatar}
+                    onChange={(e) => setProfileAvatar(e.target.value)}
+                    placeholder="e.g., 👨‍💼 👩‍💼 🦅 🚀"
+                    maxLength={2}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: 8,
+                      fontSize: 14,
+                      outline: 'none',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = primaryColor}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  />
+                  <p style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+                    Enter an emoji, upload a photo, or leave empty to use your initial
+                  </p>
+                </div>
+
+                {/* Emoji Suggestions */}
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: '#666',
+                    marginBottom: 8,
+                  }}>
+                    Quick Pick:
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {['👨‍💼', '👩‍💼', '🦅', '🚀', '⭐', '💼', '👔', '🎯', '💪', '🔥'].map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => setProfileAvatar(emoji)}
+                        style={{
+                          fontSize: 24,
+                          padding: '8px 12px',
+                          border: profileAvatar === emoji ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                          borderRadius: 8,
+                          background: profileAvatar === emoji ? `${primaryColor}20` : '#f9f9f9',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setShowProfileModal(false)}
+                disabled={profileSaving}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: '2px solid #e5e7eb',
+                  background: '#fff',
+                  color: '#666',
+                  cursor: profileSaving ? 'not-allowed' : 'pointer',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProfileUpdate}
+                disabled={profileSaving || !profileName.trim()}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: profileSaving || !profileName.trim() ? '#ccc' : primaryColor,
+                  color: '#fff',
+                  cursor: profileSaving || !profileName.trim() ? 'not-allowed' : 'pointer',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {profileSaving ? 'Saving...' : '💾 Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#f6f6f7' }}>
       {header}
       {loading ? (
-        <div style={{ padding: 24 }}>Yükleniyor...</div>
+        <div style={{ padding: 24 }}>Loading...</div>
       ) : (
-        <div style={{ padding: 16, overflowX: 'auto' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            {columns.map(renderColumn)}
-            {newColumnCard}
+        <>
+          {globalSearch && (
+            <div style={{ 
+              padding: '12px 24px', 
+              background: '#fff', 
+              borderBottom: '1px solid #e5e7eb',
+              color: '#666',
+              fontSize: 13
+            }}>
+              🔍 Searching for: <strong>{globalSearch}</strong>
+              {globalFilteredColumns.reduce((sum, col) => sum + col.cards.length, 0) === 0 && (
+                <span style={{ color: '#DC2626', marginLeft: 8 }}>No results found</span>
+              )}
+            </div>
+          )}
+          <div style={{ padding: 16, overflowX: 'auto' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              {globalFilteredColumns.map(renderColumn)}
+              {!globalSearch && newColumnCard}
+            </div>
           </div>
-        </div>
+        </>
       )}
       {renderModal()}
+      {renderArchiveDrawer()}
+      {renderThemePicker()}
+      {renderProfileModal()}
     </div>
   );
 }

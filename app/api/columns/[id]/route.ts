@@ -8,13 +8,14 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { title, order } = body;
+    const { title, order, isArchived } = body;
 
     const column = await prisma.column.update({
       where: { id: params.id },
       data: {
         ...(title && { title }),
         ...(order !== undefined && { order }),
+        ...(isArchived !== undefined && { isArchived }),
       },
       include: {
         cards: {
@@ -34,19 +35,27 @@ export async function PATCH(
   }
 }
 
-// DELETE column
+// DELETE column (archive)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.column.delete({
+    // Soft delete by archiving
+    await prisma.column.update({
       where: { id: params.id },
+      data: { isArchived: true },
+    });
+
+    // Also archive all cards in this column
+    await prisma.card.updateMany({
+      where: { columnId: params.id },
+      data: { isArchived: true },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting column:', error);
-    return NextResponse.json({ error: 'Failed to delete column' }, { status: 500 });
+    console.error('Error archiving column:', error);
+    return NextResponse.json({ error: 'Failed to archive column' }, { status: 500 });
   }
 }

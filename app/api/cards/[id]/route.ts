@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 // GET card details
 export async function GET(
@@ -33,7 +34,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { title, description, columnId, order } = body;
+    const { title, description, columnId, order, isArchived, dueDate, labels, coverImage } = body;
 
     const card = await prisma.card.findUnique({
       where: { id: params.id },
@@ -50,6 +51,10 @@ export async function PATCH(
         ...(description !== undefined && { description }),
         ...(columnId !== undefined && { columnId }),
         ...(order !== undefined && { order }),
+        ...(isArchived !== undefined && { isArchived }),
+        ...(dueDate !== undefined && { dueDate }),
+        ...(labels !== undefined && { labels }),
+        ...(coverImage !== undefined && { coverImage }),
       },
       include: {
         comments: true,
@@ -58,12 +63,15 @@ export async function PATCH(
       },
     });
 
+    const userId = getUserIdFromRequest(request);
+
     // Log activity for title change
     if (title !== undefined && title !== card.title) {
       await prisma.activity.create({
         data: {
           cardId: params.id,
           message: `Card renamed from "${card.title}" to "${title}"`,
+          userId,
         },
       });
     }
@@ -74,6 +82,7 @@ export async function PATCH(
         data: {
           cardId: params.id,
           message: `Card moved to a different column`,
+          userId,
         },
       });
     }
@@ -85,19 +94,21 @@ export async function PATCH(
   }
 }
 
-// DELETE card
+// DELETE card (archive)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.card.delete({
+    // Soft delete by archiving
+    await prisma.card.update({
       where: { id: params.id },
+      data: { isArchived: true },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting card:', error);
+    console.error('Error archiving card:', error);
     return NextResponse.json({ error: 'Failed to delete card' }, { status: 500 });
   }
 }

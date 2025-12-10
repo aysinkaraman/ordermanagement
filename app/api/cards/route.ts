@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 // POST create card
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { columnId, title, description } = body;
+    const userId = getUserIdFromRequest(request);
 
     const maxOrderCard = await prisma.card.findFirst({
       where: { columnId },
@@ -20,10 +22,12 @@ export async function POST(request: NextRequest) {
         title,
         description: description || null,
         order: newOrder,
+        userId,
       },
       include: {
         comments: true,
         activities: true,
+        user: true,
       },
     });
 
@@ -32,6 +36,7 @@ export async function POST(request: NextRequest) {
       data: {
         cardId: card.id,
         message: `Card "${card.title}" created`,
+        userId,
       },
     });
 

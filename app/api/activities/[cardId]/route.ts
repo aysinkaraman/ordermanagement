@@ -10,6 +10,15 @@ export async function GET(
     const activities = await prisma.activity.findMany({
       where: { cardId: params.cardId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(activities);
