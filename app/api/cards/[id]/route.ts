@@ -96,7 +96,7 @@ export async function PATCH(
 
 // DELETE card (archive)
 export async function DELETE(
-  _request: Request,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
