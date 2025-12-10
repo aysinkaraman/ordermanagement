@@ -17,10 +17,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify token
-    let userId: number;
+    let userId: string;
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
-      userId = decoded.userId;
+      userId = decoded.userId.toString();
     } catch (error) {
       return NextResponse.json(
         { error: 'Invalid token' },
