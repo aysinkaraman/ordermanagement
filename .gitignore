@@ -1,0 +1,9 @@
+.env.local
+.env
+node_modules/
+dist/
+build/
+.next/
+.DS_Store
+*.log
+.prisma/

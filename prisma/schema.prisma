@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Column {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int
+  cards     Card[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Card {
+  id          String       @id @default(cuid())
+  columnId    String
+  column      Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int
+  comments    Comment[]
+  activities  Activity[]
+  attachments Attachment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([columnId])
+  @@index([order])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([cardId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  filename  String
+  url       String
+  size      Int
+  mimeType  String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([cardId])
+}
