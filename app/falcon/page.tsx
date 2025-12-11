@@ -1216,6 +1216,62 @@ export default function App() {
           <div style={{ display: 'flex', gap: 4 }}>
             {!showArchived && (
               <>
+                <button 
+                  onClick={async () => {
+                    const currentIndex = columns.findIndex(c => c.id === col.id);
+                    if (currentIndex <= 0) return;
+                    
+                    const newColumns = [...columns];
+                    [newColumns[currentIndex - 1], newColumns[currentIndex]] = [newColumns[currentIndex], newColumns[currentIndex - 1]];
+                    setColumns(newColumns);
+                    
+                    // Save to database
+                    await Promise.all(newColumns.map((c, i) => 
+                      fetch(`/api/columns/${c.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: i }),
+                      })
+                    ));
+                  }} 
+                  title="Move left"
+                  disabled={columns.findIndex(c => c.id === col.id) === 0}
+                  style={{
+                    ...iconBtnStyle,
+                    opacity: columns.findIndex(c => c.id === col.id) === 0 ? 0.3 : 1,
+                    cursor: columns.findIndex(c => c.id === col.id) === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  ←
+                </button>
+                <button 
+                  onClick={async () => {
+                    const currentIndex = columns.findIndex(c => c.id === col.id);
+                    if (currentIndex >= columns.length - 1) return;
+                    
+                    const newColumns = [...columns];
+                    [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
+                    setColumns(newColumns);
+                    
+                    // Save to database
+                    await Promise.all(newColumns.map((c, i) => 
+                      fetch(`/api/columns/${c.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: i }),
+                      })
+                    ));
+                  }} 
+                  title="Move right"
+                  disabled={columns.findIndex(c => c.id === col.id) === columns.length - 1}
+                  style={{
+                    ...iconBtnStyle,
+                    opacity: columns.findIndex(c => c.id === col.id) === columns.length - 1 ? 0.3 : 1,
+                    cursor: columns.findIndex(c => c.id === col.id) === columns.length - 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  →
+                </button>
                 <button style={iconBtnStyle} onClick={() => setOpenListMenuId(isMenuOpen ? null : col.id)} title="List actions">
                   ⋯
                 </button>
@@ -1793,9 +1849,33 @@ export default function App() {
     localStorage.setItem('companyName', companyName);
   };
 
-  const handleBoardTitleSave = () => {
+  const handleBoardTitleSave = async () => {
     setEditingBoardTitle(false);
-    localStorage.setItem('boardTitle', boardTitle);
+    
+    if (!currentBoardId) {
+      alert('No board selected');
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/boards/${currentBoardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: boardTitle }),
+      });
+      
+      if (res.ok) {
+        console.log('✅ Board title saved:', boardTitle);
+        localStorage.setItem('boardTitle', boardTitle);
+      } else {
+        const error = await res.json();
+        console.error('Failed to save board title:', error);
+        alert('Board title could not be saved');
+      }
+    } catch (e) {
+      console.error('Save board title error:', e);
+      alert('Failed to save board title');
+    }
   };
 
   // Load branding and theme from localStorage
