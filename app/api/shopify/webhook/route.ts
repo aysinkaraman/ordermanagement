@@ -40,11 +40,18 @@ export async function POST(request: NextRequest) {
     console.log('🔍 RAW TAGS:', order.tags);
     console.log('🔍 TAG TYPE:', typeof order.tags);
 
-    // If tags are empty or missing, wait 10 seconds and re-fetch from Shopify API
-    // This handles Shopify Flow adding tags after webhook fires
+    // Check if important tags exist (priority, express, shop location, shipping)
+    // If not, wait 10 seconds for Shopify Flow to add them
     let finalOrder = order;
-    if (!order.tags || order.tags.trim() === '') {
-      console.log('⏳ No tags found, waiting 10 seconds for Shopify Flow to add tags...');
+    const initialTags = (order.tags || '').toLowerCase();
+    const hasImportantTags = initialTags.includes('priority') || 
+                             initialTags.includes('express') || 
+                             initialTags.includes('shop location') || 
+                             initialTags.includes('shipping');
+    
+    if (!hasImportantTags) {
+      console.log('⏳ No important tags found, waiting 10 seconds for Shopify Flow...');
+      console.log('📝 Initial tags were:', order.tags);
       
       await new Promise(resolve => setTimeout(resolve, 10000));
       
@@ -67,6 +74,8 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.log('⚠️ Error re-fetching order:', e);
       }
+    } else {
+      console.log('✅ Important tags already present, no need to wait');
     }
     
     // Normalize entire tag string to lowercase for matching
