@@ -54,27 +54,52 @@ export async function POST(request: NextRequest) {
     }
     
     // Check tags ONLY - priority has highest precedence, stop after first match
+    // IMPORTANT: Check in priority order - first match wins
+    
     for (const tag of tags) {
-      if (tag.includes('priority')) {
+      // Priority - highest priority
+      if (tag.includes('priority') || tag.includes('öncelik')) {
         targetColumn = 'Priority';
         foundTag = true;
-        console.log('🔥 Priority order detected from tag:', tag, '- STOPPING here, ignoring other tags');
+        console.log('🔥 PRIORITY order detected from tag:', tag, '- STOPPING here');
         break;
-      } else if (tag.includes('express')) {
-        targetColumn = 'Express';
-        foundTag = true;
-        console.log('⚡ Express order detected from tag:', tag, '- STOPPING here');
-        break;
-      } else if (tag.includes('ground') || tag.includes('shipping')) {
-        targetColumn = 'Ground';
-        foundTag = true;
-        console.log('🚚 Ground order detected from tag:', tag, '- STOPPING here');
-        break;
-      } else if (tag.includes('pickup') || tag.includes('shop location')) {
-        targetColumn = 'Pickup';
-        foundTag = true;
-        console.log('📍 Pickup order detected from tag:', tag, '- STOPPING here');
-        break;
+      }
+    }
+    
+    // If no priority tag, check express
+    if (!foundTag) {
+      for (const tag of tags) {
+        if (tag.includes('express')) {
+          targetColumn = 'Express';
+          foundTag = true;
+          console.log('⚡ EXPRESS order detected from tag:', tag, '- STOPPING here');
+          break;
+        }
+      }
+    }
+    
+    // If no express, check pickup
+    if (!foundTag) {
+      for (const tag of tags) {
+        if (tag.includes('pickup') || tag.includes('shop location') || tag.includes('pick up')) {
+          targetColumn = 'Pickup';
+          foundTag = true;
+          console.log('📍 PICKUP order detected from tag:', tag, '- STOPPING here');
+          break;
+        }
+      }
+    }
+    
+    // If no specific tag, default to Ground
+    if (!foundTag && tags.length > 0) {
+      // Only check for ground/shipping tags if no other match found
+      for (const tag of tags) {
+        if (tag.includes('ground') || tag.includes('shipping') || tag.includes('standard')) {
+          targetColumn = 'Ground';
+          foundTag = true;
+          console.log('🚚 GROUND order detected from tag:', tag);
+          break;
+        }
       }
     }
     
@@ -84,11 +109,30 @@ export async function POST(request: NextRequest) {
     
     console.log('✅ Final target column:', targetColumn);
 
-    // Use the FIRST available board (user's main board)
-    let board = await prisma.board.findFirst({
-      include: { columns: { orderBy: { order: 'asc' } } },
-      orderBy: { createdAt: 'asc' }
-    });
+    // Use specific board from env variable, or fallback to first board
+    const targetBoardId = process.env.SHOPIFY_TARGET_BOARD_ID;
+    let board;
+    
+    if (targetBoardId) {
+      console.log('🎯 Using target board ID from env:', targetBoardId);
+      board = await prisma.board.findUnique({
+        where: { id: targetBoardId },
+        include: { columns: { orderBy: { order: 'asc' } } }
+      });
+      
+      if (!board) {
+        console.error('❌ Target board not found:', targetBoardId, '- falling back to first board');
+      }
+    }
+    
+    // Fallback: use the first available board (user's main board)
+    if (!board) {
+      console.log('📋 Using first available board');
+      board = await prisma.board.findFirst({
+        include: { columns: { orderBy: { order: 'asc' } } },
+        orderBy: { createdAt: 'asc' }
+      });
+    }
 
     // If no board exists at all, create one
     if (!board) {
