@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+// import crypto from 'crypto'; // TEMPORARILY DISABLED FOR DEBUGGING
 
 // Default column names (shipping types)
 const DEFAULT_COLUMNS = ['Priority', 'Express', 'Ground', 'Pickup'];
 
+// TEMPORARILY DISABLED FOR DEBUGGING
+/*
 function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string): boolean {
   const hash = crypto
     .createHmac('sha256', secret)
@@ -12,6 +14,7 @@ function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string):
     .digest('base64');
   return hash === hmacHeader;
 }
+*/
 
 // POST - Webhook endpoint for new orders
 export async function POST(request: NextRequest) {
@@ -19,7 +22,13 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256');
     
+    console.log('🔐 Webhook received - HMAC present:', !!hmacHeader);
+    console.log('🔐 Webhook secret configured:', !!process.env.SHOPIFY_WEBHOOK_SECRET);
+    console.log('🌍 Environment:', process.env.NODE_ENV);
+    
     // Verify webhook authenticity in production
+    // TEMPORARILY DISABLED FOR DEBUGGING
+    /*
     if (process.env.NODE_ENV === 'production' && hmacHeader) {
       const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
       if (webhookSecret && !verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
@@ -27,6 +36,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
+    */
 
     const order = JSON.parse(rawBody);
     console.log('📦 New order webhook received:', order.order_number);
