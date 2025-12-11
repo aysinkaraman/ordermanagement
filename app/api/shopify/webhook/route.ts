@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       
       // 1. PRIORITY - Highest priority, check FIRST and STOP
       for (const tag of tags) {
-        if (tag === 'priority' || tag.includes('priority')) {
+        if (tag === 'priority') {
           targetColumn = 'Priority';
           foundTag = true;
           console.log('🔥 PRIORITY tag matched:', tag, '→ Priority list');
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       // 2. EXPRESS - Only if no priority tag found
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'express' || tag.includes('express')) {
+          if (tag === 'express') {
             targetColumn = 'Express';
             foundTag = true;
             console.log('⚡ EXPRESS tag matched:', tag, '→ Express list');
@@ -81,25 +81,25 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // 3. PICKUP (shop location) - Check BEFORE ground because "shop location" might contain other words
+      // 3. GROUND SHIPPING VARIANTS - Check specific variants first (most specific to least)
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'shop location' || tag.includes('shop location') || tag === 'pickup' || tag.includes('pickup')) {
-            targetColumn = 'Pickup';
+          if (tag === 'free ground shipping' || tag === 'ground shipping' || tag === 'shipping') {
+            targetColumn = 'Ground';
             foundTag = true;
-            console.log('📍 PICKUP tag matched:', tag, '→ Pickup list');
+            console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
             break;
           }
         }
       }
       
-      // 4. GROUND - shipping or free ground shipping
+      // 4. PICKUP (shop location) - Check LAST
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'shipping' || tag === 'free ground shipping' || tag.includes('ground shipping') || tag.includes('shipping')) {
-            targetColumn = 'Ground';
+          if (tag === 'shop location') {
+            targetColumn = 'Pickup';
             foundTag = true;
-            console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
+            console.log('📍 PICKUP tag matched:', tag, '→ Pickup list');
             break;
           }
         }
