@@ -3187,18 +3187,59 @@ export default function App() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
                     {board.title || 'Untitled Board'}
                   </h3>
-                  {currentBoardId === board.id && (
-                    <span style={{ 
-                      background: primaryColor, 
-                      color: '#fff', 
-                      padding: '2px 8px', 
-                      borderRadius: 4, 
-                      fontSize: 11, 
-                      fontWeight: 600 
-                    }}>
-                      Active
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {currentBoardId === board.id && (
+                      <span style={{ 
+                        background: primaryColor, 
+                        color: '#fff', 
+                        padding: '2px 8px', 
+                        borderRadius: 4, 
+                        fontSize: 11, 
+                        fontWeight: 600 
+                      }}>
+                        Active
+                      </span>
+                    )}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!confirm(`"${board.title}" board'unu silmek istediğinden emin misin? Bu işlem geri alınamaz!`)) {
+                          return;
+                        }
+                        try {
+                          const res = await fetch(`/api/boards/${board.id}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            alert('✅ Board silindi!');
+                            if (currentBoardId === board.id) {
+                              setCurrentBoardId(null);
+                              setColumns([]);
+                            }
+                            loadBoards();
+                          } else {
+                            const error = await res.json();
+                            alert('❌ Hata: ' + (error.error || 'Board silinemedi'));
+                          }
+                        } catch (err) {
+                          console.error('Delete board error:', err);
+                          alert('❌ Board silinemedi');
+                        }
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 18,
+                        padding: 4,
+                        opacity: 0.6,
+                        transition: 'opacity 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                      title="Delete Board"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
                 <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                   <span>📊 {board._count?.columns || 0} lists</span>
