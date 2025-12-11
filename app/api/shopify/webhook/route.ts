@@ -50,58 +50,70 @@ export async function POST(request: NextRequest) {
       console.log('🏷️ Parsed tags array:', tags);
     }
     
-    // Check tags ONLY - priority has highest precedence, stop after first match
-    // IMPORTANT: Check in priority order - first match wins
+    // CRITICAL: Tags are added by Shopify Flow with 5-10 second delay
+    // If no tags found, return error so Shopify will retry the webhook
+    if (!tags || tags.length === 0) {
+      console.error('❌ No tags found on order - tags not ready yet. Webhook will retry.');
+      return NextResponse.json({ 
+        error: 'Order tags not ready. Please retry in 10 seconds.' 
+      }, { status: 400 });
+    }
     
+    // Check tags ONLY - priority has highest precedence, stop after first match
+    // IMPORTANT: Check in EXACT priority order - first match wins
+    
+    // 1. PRIORITY - Highest priority, check first
     for (const tag of tags) {
-      // Priority - highest priority
-      if (tag.includes('priority') || tag.includes('öncelik')) {
+      if (tag.includes('priority')) {
         targetColumn = 'Priority';
         foundTag = true;
-        console.log('🔥 PRIORITY order detected from tag:', tag, '- STOPPING here');
+        console.log('🔥 PRIORITY tag found:', tag, '- assigned to Priority list');
         break;
       }
     }
     
-    // If no priority tag, check express
+    // 2. EXPRESS - Only if no priority tag
     if (!foundTag) {
       for (const tag of tags) {
         if (tag.includes('express')) {
           targetColumn = 'Express';
           foundTag = true;
-          console.log('⚡ EXPRESS order detected from tag:', tag, '- STOPPING here');
+          console.log('⚡ EXPRESS tag found:', tag, '- assigned to Express list');
           break;
         }
       }
     }
     
-    // If no express, check pickup
+    // 3. GROUND - Only if no priority or express tag
     if (!foundTag) {
       for (const tag of tags) {
-        if (tag.includes('pickup') || tag.includes('shop location') || tag.includes('pick up')) {
-          targetColumn = 'Pickup';
-          foundTag = true;
-          console.log('📍 PICKUP order detected from tag:', tag, '- STOPPING here');
-          break;
-        }
-      }
-    }
-    
-    // If no specific tag, default to Ground
-    if (!foundTag && tags.length > 0) {
-      // Only check for ground/shipping tags if no other match found
-      for (const tag of tags) {
-        if (tag.includes('ground') || tag.includes('shipping') || tag.includes('standard')) {
+        if (tag.includes('ground shipping') || tag.includes('free ground shipping') || tag.includes('shipping')) {
           targetColumn = 'Ground';
           foundTag = true;
-          console.log('🚚 GROUND order detected from tag:', tag);
+          console.log('🚚 GROUND/SHIPPING tag found:', tag, '- assigned to Ground list');
           break;
         }
       }
     }
     
+    // 4. PICKUP - Only if no other tags matched
     if (!foundTag) {
-      console.log('⚠️ No matching tag found, using default: Ground');
+      for (const tag of tags) {
+        if (tag.includes('shop location') || tag.includes('pickup')) {
+          targetColumn = 'Pickup';
+          foundTag = true;
+          console.log('📍 PICKUP tag found:', tag, '- assigned to Pickup list');
+          break;
+        }
+      }
+    }
+    
+    // If NO matching tag found, return error - do NOT assign to any list
+    if (!foundTag) {
+      console.error('❌ No valid tag found on order. Tags:', tags.join(', '));
+      return NextResponse.json({ 
+        error: `No valid list assignment tag found. Order tags: ${order.tags}` 
+      }, { status: 400 });
     }
     
     console.log('✅ Final target column:', targetColumn);
