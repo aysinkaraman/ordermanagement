@@ -40,13 +40,13 @@ export async function POST(request: NextRequest) {
     console.log('🔍 RAW TAGS:', order.tags);
     console.log('🔍 TAG TYPE:', typeof order.tags);
 
-    // If tags are empty or missing, wait 30 seconds and re-fetch from Shopify API
+    // If tags are empty or missing, wait 10 seconds and re-fetch from Shopify API
     // This handles Shopify Flow adding tags after webhook fires
     let finalOrder = order;
     if (!order.tags || order.tags.trim() === '') {
-      console.log('⏳ No tags found, waiting 30 seconds for Shopify Flow to add tags...');
+      console.log('⏳ No tags found, waiting 10 seconds for Shopify Flow to add tags...');
       
-      await new Promise(resolve => setTimeout(resolve, 30000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
       
       // Re-fetch order from Shopify API to get updated tags
       try {
