@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 // import crypto from 'crypto'; // TEMPORARILY DISABLED FOR DEBUGGING
 
-// Default column names (shipping types)
-const DEFAULT_COLUMNS = ['Priority', 'Express', 'Ground', 'Pickup'];
-
 // TEMPORARILY DISABLED FOR DEBUGGING
 /*
 function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string): boolean {
@@ -134,29 +131,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If no board exists at all, create one
+    // If no board exists, return error - DO NOT auto-create boards
     if (!board) {
-      console.log('📋 No boards found, creating first board');
-      
-      // Get first user as owner
-      const firstUser = await prisma.user.findFirst();
-      if (!firstUser) {
-        return NextResponse.json({ error: 'No users found' }, { status: 500 });
-      }
-
-      board = await prisma.board.create({
-        data: {
-          title: 'Falcon Board',
-          ownerId: firstUser.id,
-          columns: {
-            create: DEFAULT_COLUMNS.map((title, index) => ({
-              title,
-              order: index,
-            }))
-          }
-        },
-        include: { columns: { orderBy: { order: 'asc' } } }
-      });
+      console.error('❌ No boards found - webhook cannot auto-create boards');
+      return NextResponse.json({ 
+        error: 'No target board found. Please create a board first or set SHOPIFY_TARGET_BOARD_ID environment variable.' 
+      }, { status: 400 });
     }
     
     console.log('📋 Using board:', board.title, '(ID:', board.id, ')');
