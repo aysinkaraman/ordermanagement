@@ -680,7 +680,7 @@ export default function App() {
     }
   };
 
-  // Refresh board data
+  // Refresh board data (cards only, preserve column order)
   const refreshBoardData = async () => {
     if (!currentBoardId) {
       console.log('⚠️ No currentBoardId, skipping refresh');
@@ -700,8 +700,28 @@ export default function App() {
       
       // Only update if we're still on the same board
       if (board.id === currentBoardId && board.columns) {
-        const newColumns = board.columns.map(mapApiColumn);
-        setColumns(newColumns);
+        // IMPORTANT: Preserve current column order, only update cards
+        setColumns(prevColumns => {
+          const newColumnsFromApi = board.columns.map(mapApiColumn);
+          
+          // If we have existing columns with custom order, merge cards but keep order
+          if (prevColumns.length > 0) {
+            return prevColumns.map(prevCol => {
+              const updatedCol = newColumnsFromApi.find((c: Column) => c.id === prevCol.id);
+              if (updatedCol) {
+                // Keep the column but update its cards
+                return {
+                  ...prevCol,
+                  cards: updatedCol.cards,
+                };
+              }
+              return prevCol;
+            });
+          }
+          
+          // First load - use API order
+          return newColumnsFromApi;
+        });
       } else {
         console.log('⚠️ Board ID mismatch, not updating');
       }
@@ -1020,12 +1040,15 @@ export default function App() {
     if (draggingColumnId) e.preventDefault();
   };
 
-  const handleColumnDrop = (e: React.DragEvent, targetColumnId: string | number) => {
+  const handleColumnDrop = async (e: React.DragEvent, targetColumnId: string | number) => {
     e.preventDefault();
     if (!draggingColumnId || draggingColumnId === targetColumnId) {
       setDraggingColumnId(null);
       return;
     }
+    
+    let newColumns: Column[] = [];
+    
     setColumns((prev) => {
       const next = [...prev];
       const fromIdx = next.findIndex((c) => c.id === draggingColumnId);
@@ -1033,9 +1056,26 @@ export default function App() {
       if (fromIdx === -1 || toIdx === -1) return prev;
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
+      newColumns = next;
       return next;
     });
+    
     setDraggingColumnId(null);
+    
+    // Save new order to database
+    try {
+      console.log('💾 Saving column order after drag-drop');
+      await Promise.all(newColumns.map((c, i) => 
+        fetch(`/api/columns/${c.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: i }),
+        })
+      ));
+      console.log('✅ Column order saved');
+    } catch (e) {
+      console.error('❌ Failed to save column order:', e);
+    }
   };
 
   // List Actions
