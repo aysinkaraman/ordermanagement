@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { title, order, isArchived } = body;
+    const { title, order, isArchived, color } = body;
 
     const column = await prisma.column.update({
       where: { id: params.id },
@@ -16,6 +16,7 @@ export async function PATCH(
         ...(title && { title }),
         ...(order !== undefined && { order }),
         ...(isArchived !== undefined && { isArchived }),
+        ...(color !== undefined && { color }),
       },
       include: {
         cards: {

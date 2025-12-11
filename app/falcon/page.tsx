@@ -114,11 +114,6 @@ type Column = {
   cards: Card[];
 };
 
-type ColumnSettings = {
-  color?: string | null;
-  sortDirection?: 'asc' | 'desc';
-};
-
 type User = {
   id: number;
   email: string;
@@ -155,7 +150,6 @@ export default function App() {
   const [draggingColumnId, setDraggingColumnId] = useState<string | number | null>(null);
   const [openListMenuId, setOpenListMenuId] = useState<string | number | null>(null);
   const [openSortMenuId, setOpenSortMenuId] = useState<string | number | null>(null);
-  const [columnSettings, setColumnSettings] = useState<Record<string | number, ColumnSettings>>({});
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
@@ -240,22 +234,6 @@ export default function App() {
     name: apiCol.title ?? '',
     cards: (apiCol.cards || []).map(mapApiCard),
   });
-
-  const colorPalette = [
-    '#FF6B6B',
-    '#4ECDC4',
-    '#45B7D1',
-    '#FFA07A',
-    '#98D8C8',
-    '#F7DC6F',
-    '#BB8FCE',
-    '#85C1E2',
-    '#F8B88B',
-    '#FFB6D9',
-    '#B4E7CE',
-    '#DDA0DD',
-    '#90EE90',
-  ];
 
   // Load user from localStorage
   useEffect(() => {
@@ -1116,13 +1094,6 @@ export default function App() {
     setOpenListMenuId(null);
   };
 
-  const setColumnColor = (columnId: string | number, color: string | null) => {
-    setColumnSettings((prev) => ({
-      ...prev,
-      [columnId]: { ...(prev[columnId] || {}), color },
-    }));
-  };
-
   // Render helpers
   const renderCard = (card: Card, columnId: string | number) => {
     const attachmentCount = (card.attachments || []).length;
@@ -1216,9 +1187,17 @@ export default function App() {
     );
   };
 
+  const getColumnColor = (index: number) => {
+    const colors = [
+      '#FFE5E5', '#E5F5FF', '#FFF4E5', '#E8F5E9', '#F3E5F5',
+      '#FFF9C4', '#E1F5FE', '#FCE4EC', '#F1F8E9', '#E0F2F1'
+    ];
+    return colors[index % colors.length];
+  };
+
   const renderColumn = (col: Column) => {
-    const settings = columnSettings[col.id] || {};
-    const bg = settings.color || '#f1f2f3';
+    const colIndex = columns.findIndex(c => c.id === col.id);
+    const bg = getColumnColor(colIndex);
     const isMenuOpen = openListMenuId === col.id;
     const isAddCardActive = activeAddColumnId === col.id;
 
@@ -1385,26 +1364,7 @@ export default function App() {
               Sort by...
               <span style={{ fontSize: 10 }}>▶</span>
             </div>
-            <div style={{ fontSize: 12, color: '#555', margin: '8px 0 4px' }}>Change list color</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
-              {colorPalette.map((c) => (
-                <div
-                  key={c}
-                  onClick={() => setColumnColor(col.id, c)}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 4,
-                    background: c,
-                    cursor: 'pointer',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                  }}
-                />
-              ))}
-            </div>
-            <div style={menuItemStyle} onClick={() => setColumnColor(col.id, null)}>
-              Remove color
-            </div>
+
           </div>
         )}
 
@@ -1587,6 +1547,10 @@ export default function App() {
     const attachments = activeCard.attachments || [];
     const comments = activeCard.comments || [];
     const activities = activeCard.activities || [];
+    
+    const activeCol = columns.find(c => String(c.id) === String(activeCard.columnId));
+    const colIndex = activeCol ? columns.findIndex(c => c.id === activeCol.id) : 0;
+    const modalBg = getColumnColor(colIndex);
 
     return (
       <div
@@ -1605,7 +1569,7 @@ export default function App() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: '#fff',
+            background: modalBg,
             borderRadius: 12,
             boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
             width: '90%',

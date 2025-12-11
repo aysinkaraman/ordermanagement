@@ -116,6 +116,7 @@ model Column {
   id         String   @id @default(cuid())
   title      String
   order      Int
+  color      String?
   isArchived Boolean  @default(false)
   boardId    String?
   board      Board?   @relation(fields: [boardId], references: [id], onDelete: Cascade)
