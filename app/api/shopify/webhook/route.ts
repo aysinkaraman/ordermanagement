@@ -86,25 +86,25 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // 3. GROUND SHIPPING VARIANTS - Check specific variants first (most specific to least)
-      if (!foundTag) {
-        for (const tag of tags) {
-          if (tag.includes('free ground shipping') || tag.includes('ground shipping') || tag.includes('shipping')) {
-            targetColumn = 'Ground';
-            foundTag = true;
-            console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
-            break;
-          }
-        }
-      }
-      
-      // 4. PICKUP (shop location) - Check LAST
+      // 3. PICKUP (shop location) - Check BEFORE shipping to avoid false matches
       if (!foundTag) {
         for (const tag of tags) {
           if (tag.includes('shop location') || tag.includes('pickup')) {
             targetColumn = 'Pickup';
             foundTag = true;
             console.log('📍 PICKUP tag matched:', tag, '→ Pickup list');
+            break;
+          }
+        }
+      }
+      
+      // 4. GROUND SHIPPING VARIANTS - Check after pickup
+      if (!foundTag) {
+        for (const tag of tags) {
+          if (tag.includes('free ground shipping') || tag.includes('ground shipping') || tag.includes('shipping')) {
+            targetColumn = 'Ground';
+            foundTag = true;
+            console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
             break;
           }
         }
