@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
 
     const order = JSON.parse(rawBody);
     console.log('📦 New order webhook received:', order.order_number);
+    console.log('🔍 RAW TAGS:', order.tags);
+    console.log('🔍 TAG TYPE:', typeof order.tags);
 
     // Determine target column based on tags ONLY (ignore shipping lines)
     let targetColumn = 'Ground'; // default
