@@ -172,11 +172,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Order already exists', cardId: existingCard.id });
     }
 
-    // Get max order for position
+    // Get max order across ALL cards in the board (not just this column)
+    // This ensures new orders always go to the bottom, in arrival order
     const maxOrderCard = await prisma.card.findFirst({
-      where: { columnId: column.id },
+      where: { 
+        column: {
+          boardId: board.id
+        }
+      },
       orderBy: { order: 'desc' },
     });
+    
+    const nextOrder = (maxOrderCard?.order ?? -1) + 1;
+    console.log('📊 New card will be positioned at:', nextOrder, '(current max:', maxOrderCard?.order ?? 'none', ')');
 
     // Prepare order details
     const customerName = order.customer 
@@ -206,13 +214,13 @@ ${order.shipping_address.country || ''}
 `.trim() : 'N/A'}
     `.trim();
 
-    // Create card
+    // Create card - always add to bottom based on arrival time
     const card = await prisma.card.create({
       data: {
         columnId: column.id,
         title: `🛍️ Order #${order.order_number}`,
         description: orderDetails,
-        order: (maxOrderCard?.order ?? -1) + 1,
+        order: nextOrder,
       },
     });
 
