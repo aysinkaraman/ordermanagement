@@ -40,55 +40,34 @@ export async function POST(request: NextRequest) {
     console.log('🔍 RAW TAGS:', order.tags);
     console.log('🔍 TAG TYPE:', typeof order.tags);
 
-    // Parse and normalize tags
-    let tags: string[] = [];
-    if (order.tags && typeof order.tags === 'string') {
-      tags = order.tags
-        .toLowerCase()
-        .split(',')
-        .map((t: string) => t.trim())
-        .filter((t: string) => t.length > 0); // Remove empty strings
-      
-      console.log('🏷️ Normalized tags:', JSON.stringify(tags));
-    }
+    // Normalize entire tag string to lowercase for matching
+    const tagString = (order.tags || '').toLowerCase();
     
-    // Determine target column - NO DEFAULT, explicit matching only
-    let targetColumn: string | null = null;
+    console.log('🏷️ RAW tag string:', order.tags);
+    console.log('🏷️ Normalized:', tagString);
     
-    if (tags.length === 0) {
-      console.log('⚠️ No tags found on order');
-      targetColumn = 'Ground'; // Only fallback if truly no tags
+    // Determine target column by checking the ENTIRE tag string
+    let targetColumn: string;
+    
+    if (tagString.includes('priority')) {
+      targetColumn = 'Priority';
+      console.log('🔥 Found "priority" in tags → Priority list');
+    } else if (tagString.includes('express')) {
+      targetColumn = 'Express';
+      console.log('⚡ Found "express" in tags → Express list');
+    } else if (tagString.includes('shop location')) {
+      targetColumn = 'Pickup';
+      console.log('📍 Found "shop location" in tags → Pickup list');
+    } else if (
+      tagString.includes('shipping') || 
+      tagString.includes('ground shipping') || 
+      tagString.includes('free ground shipping')
+    ) {
+      targetColumn = 'Ground';
+      console.log('🚚 Found shipping-related tag → Ground list');
     } else {
-      // Check what tags exist - EXPLICIT matching
-      const hasPriority = tags.some(t => t === 'priority' || t.includes('priority'));
-      const hasExpress = tags.some(t => t === 'express' || t.includes('express'));
-      const hasPickup = tags.some(t => t === 'shop location' || t === 'pickup');
-      const hasShipping = tags.some(t => 
-        t === 'shipping' || 
-        t === 'ground shipping' || 
-        t === 'free ground shipping'
-      );
-      
-      console.log('📊 Tag flags:', { hasPriority, hasExpress, hasPickup, hasShipping });
-      
-      // Apply priority rules in order
-      if (hasPriority) {
-        targetColumn = 'Priority';
-        console.log('🔥 PRIORITY detected → Priority list');
-      } else if (hasExpress) {
-        targetColumn = 'Express';
-        console.log('⚡ EXPRESS detected → Express list');
-      } else if (hasPickup) {
-        targetColumn = 'Pickup';
-        console.log('📍 PICKUP detected → Pickup list');
-      } else if (hasShipping) {
-        targetColumn = 'Ground';
-        console.log('🚚 SHIPPING detected → Ground list');
-      } else {
-        // No recognized tags - default to Ground
-        console.log('⚠️ No recognized tags. Tags:', tags.join(', '));
-        targetColumn = 'Ground';
-      }
+      targetColumn = 'Ground';
+      console.log('⚠️ No recognized tags, using default → Ground list');
     }
     
     console.log('✅ FINAL ASSIGNMENT:', targetColumn);
@@ -126,10 +105,38 @@ export async function POST(request: NextRequest) {
       where: {
         title: { contains: `#${order.order_number}` },
       },
+      include: {
+        column: true
+      }
     });
 
     if (existingCard) {
       console.log('⚠️ Order already exists:', order.order_number);
+      
+      // If card exists but tags have changed (Flow added them later), move to correct column
+      if (existingCard.column.title !== targetColumn) {
+        console.log(`🔄 Tags changed! Moving from ${existingCard.column.title} to ${targetColumn}`);
+        
+        await prisma.card.update({
+          where: { id: existingCard.id },
+          data: { columnId: column.id }
+        });
+        
+        await prisma.activity.create({
+          data: {
+            cardId: existingCard.id,
+            message: `Order moved from ${existingCard.column.title} to ${targetColumn} (tags updated by Shopify Flow)`,
+          },
+        });
+        
+        return NextResponse.json({ 
+          message: 'Order updated with new tags', 
+          cardId: existingCard.id,
+          movedFrom: existingCard.column.title,
+          movedTo: targetColumn
+        });
+      }
+      
       return NextResponse.json({ message: 'Order already exists', cardId: existingCard.id });
     }
 
