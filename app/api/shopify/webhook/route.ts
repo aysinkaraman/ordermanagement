@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
     const initialTags = (order.tags || '').toLowerCase();
     const hasImportantTags = initialTags.includes('priority') || 
                              initialTags.includes('express') || 
-                             initialTags.includes('shop location') || 
+                             initialTags.includes('shop') || 
+                             initialTags.includes('pickup') ||
                              initialTags.includes('shipping');
     
     if (!hasImportantTags) {
@@ -93,9 +94,9 @@ export async function POST(request: NextRequest) {
     } else if (tagString.includes('express')) {
       targetColumn = 'Express';
       console.log('⚡ Found "express" in tags → Express list');
-    } else if (tagString.includes('shop location')) {
+    } else if (tagString.includes('shop location') || tagString.includes('shop') || tagString.includes('pickup')) {
       targetColumn = 'Pickup';
-      console.log('📍 Found "shop location" in tags → Pickup list');
+      console.log('📍 Found shop/pickup tag in tags → Pickup list');
     } else if (
       tagString.includes('shipping') || 
       tagString.includes('ground shipping') || 
