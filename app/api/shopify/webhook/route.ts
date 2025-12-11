@@ -49,7 +49,12 @@ export async function POST(request: NextRequest) {
     if (order.tags && typeof order.tags === 'string') {
       tags = order.tags.toLowerCase().split(',').map((t: string) => t.trim());
       console.log('🏷️ Raw tags string:', order.tags);
-      console.log('🏷️ Parsed tags array:', tags);
+      console.log('🏷️ Raw tags LENGTH:', order.tags.length);
+      console.log('🏷️ Parsed tags array:', JSON.stringify(tags));
+      console.log('🏷️ Each tag with length:');
+      tags.forEach((t, i) => {
+        console.log(`   [${i}] "${t}" (length: ${t.length}, bytes: [${Array.from(t).map(c => c.charCodeAt(0)).join(', ')}])`);
+      });
     }
     
     // Check tags - priority has highest precedence, stop after first match
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
       
       // 1. PRIORITY - Highest priority, check FIRST and STOP
       for (const tag of tags) {
-        if (tag === 'priority') {
+        if (tag.includes('priority')) {
           targetColumn = 'Priority';
           foundTag = true;
           console.log('🔥 PRIORITY tag matched:', tag, '→ Priority list');
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest) {
       // 2. EXPRESS - Only if no priority tag found
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'express') {
+          if (tag.includes('express')) {
             targetColumn = 'Express';
             foundTag = true;
             console.log('⚡ EXPRESS tag matched:', tag, '→ Express list');
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest) {
       // 3. GROUND SHIPPING VARIANTS - Check specific variants first (most specific to least)
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'free ground shipping' || tag === 'ground shipping' || tag === 'shipping') {
+          if (tag.includes('free ground shipping') || tag.includes('ground shipping') || tag.includes('shipping')) {
             targetColumn = 'Ground';
             foundTag = true;
             console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
@@ -96,7 +101,7 @@ export async function POST(request: NextRequest) {
       // 4. PICKUP (shop location) - Check LAST
       if (!foundTag) {
         for (const tag of tags) {
-          if (tag === 'shop location') {
+          if (tag.includes('shop location') || tag.includes('pickup')) {
             targetColumn = 'Pickup';
             foundTag = true;
             console.log('📍 PICKUP tag matched:', tag, '→ Pickup list');
