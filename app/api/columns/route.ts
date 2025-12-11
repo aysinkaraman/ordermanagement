@@ -8,12 +8,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const showArchived = searchParams.get('archived') === 'true';
     const mode = searchParams.get('mode') || 'cards'; // 'cards' or 'lists'
+    const boardId = searchParams.get('boardId');
     
     if (showArchived) {
       if (mode === 'lists') {
         // For archived lists view: get archived columns with their archived cards
         const columns = await prisma.column.findMany({
-          where: { isArchived: true },
+          where: { 
+            isArchived: true,
+            ...(boardId && { boardId }),
+          },
           orderBy: { order: 'asc' },
           include: {
             user: { select: { id: true, name: true, avatar: true } },
@@ -36,7 +40,10 @@ export async function GET(request: NextRequest) {
       } else {
         // For archived cards view: get all non-archived columns but only archived cards
         const columns = await prisma.column.findMany({
-          where: { isArchived: false },
+          where: { 
+            isArchived: false,
+            ...(boardId && { boardId }),
+          },
           orderBy: { order: 'asc' },
           include: {
             user: { select: { id: true, name: true, avatar: true } },
@@ -60,7 +67,10 @@ export async function GET(request: NextRequest) {
     } else {
       // For normal view: get non-archived columns with non-archived cards
       const columns = await prisma.column.findMany({
-        where: { isArchived: false },
+        where: { 
+          isArchived: false,
+          ...(boardId && { boardId }),
+        },
         orderBy: { order: 'asc' },
         include: {
           user: { select: { id: true, name: true, avatar: true } },
@@ -91,8 +101,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title } = body;
+    const { title, boardId } = body;
     const userId = getUserIdFromRequest(request);
+    
+    console.log('📝 Creating column:', { title, boardId, userId });
+    
+    if (!boardId) {
+      return NextResponse.json({ error: 'boardId is required' }, { status: 400 });
+    }
 
     const maxOrderColumn = await prisma.column.findFirst({
       orderBy: { order: 'desc' },
@@ -105,12 +121,15 @@ export async function POST(request: NextRequest) {
         title,
         order: newOrder,
         userId,
+        boardId,
       },
       include: {
         cards: true,
         user: true,
       },
     });
+    
+    console.log('✅ Column created:', column.id, 'in board:', boardId);
 
     return NextResponse.json(column, { status: 201 });
   } catch (error) {

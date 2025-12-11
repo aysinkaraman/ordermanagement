@@ -282,18 +282,27 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initial load
+  // Load columns for current board (with boardId filter)
   useEffect(() => {
     let mounted = true;
+    
+    // Don't load if no board selected
+    if (!currentBoardId) {
+      console.log('⚠️ No board selected, skipping column load');
+      return;
+    }
+    
     (async () => {
       try {
         setLoading(true);
-        let url = '/api/columns';
+        let url = `/api/columns?boardId=${currentBoardId}`;
         if (showArchived) {
-          url = `/api/columns?archived=true&mode=${archiveMode}`;
+          url = `/api/columns?boardId=${currentBoardId}&archived=true&mode=${archiveMode}`;
         }
+        console.log('📂 Loading columns for board:', currentBoardId);
         const res = await fetch(url);
         const data = await res.json();
+        console.log('✅ Columns loaded:', data?.length || 0);
         if (mounted) setColumns((data || []).map(mapApiColumn));
       } catch (e) {
         console.error('Failed to load columns', e);
@@ -305,7 +314,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [showArchived, archiveMode]);
+  }, [currentBoardId, showArchived, archiveMode]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -656,21 +665,15 @@ export default function App() {
         console.log('📌 Using first board:', targetBoard.title);
       }
       
-      // Only set if no board is currently selected
-      if (!currentBoardId) {
-        setCurrentBoardId(targetBoard.id);
-        setBoardTitle(targetBoard.title || 'Falcon Board');
-        loadBoardMembers(targetBoard.id);
-        
-        // Save to localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selectedBoardId', targetBoard.id);
-        }
-        
-        // Load board columns
-        if (targetBoard.columns) {
-          setColumns(targetBoard.columns.map(mapApiColumn));
-        }
+      // Set the board (will trigger column load via useEffect)
+      setCurrentBoardId(targetBoard.id);
+      setBoardTitle(targetBoard.title || 'Falcon Board');
+      loadBoardMembers(targetBoard.id);
+      
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedBoardId', targetBoard.id);
+        console.log('💾 Saved board to localStorage:', targetBoard.id);
       }
     } catch (e) {
       console.error('Failed to load boards', e);
