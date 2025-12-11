@@ -40,89 +40,65 @@ export async function POST(request: NextRequest) {
     console.log('🔍 RAW TAGS:', order.tags);
     console.log('🔍 TAG TYPE:', typeof order.tags);
 
-    // Determine target column based on tags ONLY (ignore shipping lines)
-    let targetColumn = 'Ground'; // default
-    let foundTag = false;
-    
-    // Parse tags
+    // Parse and normalize tags
     let tags: string[] = [];
     if (order.tags && typeof order.tags === 'string') {
-      tags = order.tags.toLowerCase().split(',').map((t: string) => t.trim());
-      console.log('🏷️ Raw tags string:', order.tags);
-      console.log('🏷️ Raw tags LENGTH:', order.tags.length);
-      console.log('🏷️ Parsed tags array:', JSON.stringify(tags));
-      console.log('🏷️ Each tag with length:');
-      tags.forEach((t, i) => {
-        console.log(`   [${i}] "${t}" (length: ${t.length}, bytes: [${Array.from(t).map(c => c.charCodeAt(0)).join(', ')}])`);
-      });
+      tags = order.tags
+        .toLowerCase()
+        .split(',')
+        .map((t: string) => t.trim())
+        .filter((t: string) => t.length > 0); // Remove empty strings
+      
+      console.log('🏷️ Normalized tags:', JSON.stringify(tags));
     }
     
-    // Check ALL tags first, then decide based on priority
-    // Priority is only checked first, all other tags are evaluated together
+    // Determine target column - NO DEFAULT, explicit matching only
+    let targetColumn: string | null = null;
     
-    if (tags && tags.length > 0) {
-      console.log('🏷️ Checking tags:', tags.join(', '));
+    if (tags.length === 0) {
+      console.log('⚠️ No tags found on order');
+      targetColumn = 'Ground'; // Only fallback if truly no tags
+    } else {
+      // Check what tags exist - EXPLICIT matching
+      const hasPriority = tags.some(t => t === 'priority' || t.includes('priority'));
+      const hasExpress = tags.some(t => t === 'express' || t.includes('express'));
+      const hasPickup = tags.some(t => t === 'shop location' || t === 'pickup');
+      const hasShipping = tags.some(t => 
+        t === 'shipping' || 
+        t === 'ground shipping' || 
+        t === 'free ground shipping'
+      );
       
-      // Check what tags exist
-      const hasPriority = tags.some(t => t.includes('priority'));
-      const hasExpress = tags.some(t => t.includes('express'));
-      const hasPickup = tags.some(t => t.includes('shop location') || t.includes('pickup'));
-      const hasShipping = tags.some(t => t.includes('free ground shipping') || t.includes('ground shipping') || t.includes('shipping'));
+      console.log('📊 Tag flags:', { hasPriority, hasExpress, hasPickup, hasShipping });
       
-      console.log('📊 Tag check results:', { hasPriority, hasExpress, hasPickup, hasShipping });
-      
-      // Apply priority rules - only Priority has precedence, rest are equal
+      // Apply priority rules in order
       if (hasPriority) {
         targetColumn = 'Priority';
-        foundTag = true;
-        console.log('🔥 PRIORITY tag found → Priority list');
+        console.log('🔥 PRIORITY detected → Priority list');
       } else if (hasExpress) {
         targetColumn = 'Express';
-        foundTag = true;
-        console.log('⚡ EXPRESS tag found → Express list');
+        console.log('⚡ EXPRESS detected → Express list');
       } else if (hasPickup) {
         targetColumn = 'Pickup';
-        foundTag = true;
-        console.log('📍 PICKUP tag found → Pickup list');
+        console.log('📍 PICKUP detected → Pickup list');
       } else if (hasShipping) {
         targetColumn = 'Ground';
-        foundTag = true;
-        console.log('🚚 SHIPPING tag found → Ground list');
+        console.log('🚚 SHIPPING detected → Ground list');
+      } else {
+        // No recognized tags - default to Ground
+        console.log('⚠️ No recognized tags. Tags:', tags.join(', '));
+        targetColumn = 'Ground';
       }
     }
     
-    // If NO matching tag found, use default Ground list
-    if (!foundTag) {
-      console.log('⚠️ No matching tag found. Tags:', tags.length > 0 ? tags.join(', ') : 'none', '- using default: Ground');
-      targetColumn = 'Ground';
-    }
-    
-    console.log('✅ Final target column:', targetColumn);
+    console.log('✅ FINAL ASSIGNMENT:', targetColumn);
 
-    // Use specific board from env variable, or fallback to first board
-    const targetBoardId = process.env.SHOPIFY_TARGET_BOARD_ID;
-    let board;
-    
-    if (targetBoardId) {
-      console.log('🎯 Using target board ID from env:', targetBoardId);
-      board = await prisma.board.findUnique({
-        where: { id: targetBoardId },
-        include: { columns: { orderBy: { order: 'asc' } } }
-      });
-      
-      if (!board) {
-        console.error('❌ Target board not found:', targetBoardId, '- falling back to first board');
-      }
-    }
-    
-    // Fallback: use the first available board (user's main board)
-    if (!board) {
-      console.log('📋 Using first available board');
-      board = await prisma.board.findFirst({
-        include: { columns: { orderBy: { order: 'asc' } } },
-        orderBy: { createdAt: 'asc' }
-      });
-    }
+    // Always use the first available board - simpler and more reliable
+    console.log('📋 Finding first available board...');
+    const board = await prisma.board.findFirst({
+      include: { columns: { orderBy: { order: 'asc' } } },
+      orderBy: { createdAt: 'asc' }
+    });
 
     // If no board exists, return error - DO NOT auto-create boards
     if (!board) {
