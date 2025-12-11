@@ -116,13 +116,17 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('📋 Using board:', board.title, '(ID:', board.id, ')');
+    console.log('📋 Board columns:', board.columns.map(c => c.title).join(', '));
 
-    // Get target column (don't create if missing - user should create manually)
+    // Get target column
     const column = board.columns.find(c => c.title === targetColumn);
     
     if (!column) {
+      console.error(`❌ Column "${targetColumn}" not found in board`);
       return NextResponse.json({ error: `Column ${targetColumn} not found` }, { status: 500 });
     }
+    
+    console.log('✅ Using column:', column.title, '(ID:', column.id, ')');
 
     // Check if order already exists
     const existingCard = await prisma.card.findFirst({
