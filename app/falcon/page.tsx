@@ -1225,14 +1225,28 @@ export default function App() {
                     [newColumns[currentIndex - 1], newColumns[currentIndex]] = [newColumns[currentIndex], newColumns[currentIndex - 1]];
                     setColumns(newColumns);
                     
+                    console.log('⬅️ Moving column left:', col.name);
+                    console.log('📊 New order:', newColumns.map((c, i) => `${c.name}:${i}`).join(', '));
+                    
                     // Save to database
-                    await Promise.all(newColumns.map((c, i) => 
-                      fetch(`/api/columns/${c.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ order: i }),
-                      })
-                    ));
+                    try {
+                      const results = await Promise.all(newColumns.map((c, i) => 
+                        fetch(`/api/columns/${c.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ order: i }),
+                        })
+                      ));
+                      
+                      const allOk = results.every(r => r.ok);
+                      if (allOk) {
+                        console.log('✅ Column order saved to database');
+                      } else {
+                        console.error('❌ Some column updates failed');
+                      }
+                    } catch (e) {
+                      console.error('❌ Failed to save column order:', e);
+                    }
                   }} 
                   title="Move left"
                   disabled={columns.findIndex(c => c.id === col.id) === 0}
@@ -1253,14 +1267,28 @@ export default function App() {
                     [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
                     setColumns(newColumns);
                     
+                    console.log('➡️ Moving column right:', col.name);
+                    console.log('📊 New order:', newColumns.map((c, i) => `${c.name}:${i}`).join(', '));
+                    
                     // Save to database
-                    await Promise.all(newColumns.map((c, i) => 
-                      fetch(`/api/columns/${c.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ order: i }),
-                      })
-                    ));
+                    try {
+                      const results = await Promise.all(newColumns.map((c, i) => 
+                        fetch(`/api/columns/${c.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ order: i }),
+                        })
+                      ));
+                      
+                      const allOk = results.every(r => r.ok);
+                      if (allOk) {
+                        console.log('✅ Column order saved to database');
+                      } else {
+                        console.error('❌ Some column updates failed');
+                      }
+                    } catch (e) {
+                      console.error('❌ Failed to save column order:', e);
+                    }
                   }} 
                   title="Move right"
                   disabled={columns.findIndex(c => c.id === col.id) === columns.length - 1}
