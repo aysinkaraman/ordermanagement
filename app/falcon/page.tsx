@@ -159,7 +159,7 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
-  const [compactView, setCompactView] = useState(false);
+  const compactView = false; // Always use comfortable view
   const [filterLabel, setFilterLabel] = useState<string>('');
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -1992,8 +1992,8 @@ export default function App() {
   };
 
   const header = (
-    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 300 }}>
         {/* Company Logo */}
         <div 
           onClick={() => logoInputRef.current?.click()}
@@ -2164,27 +2164,6 @@ export default function App() {
             </button>
           )}
         </div>
-
-        {/* Compact View Toggle */}
-        <button
-          onClick={() => setCompactView(!compactView)}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 6,
-            border: 'none',
-            background: compactView ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
-            color: compactView ? '#92400E' : '#fff',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-          title={compactView ? 'Comfortable View' : 'Compact View'}
-        >
-          {compactView ? '📋 Compact' : '📝 Comfortable'}
-        </button>
 
         {/* Label Filter */}
         {!showArchived && (() => {
