@@ -40,10 +40,39 @@ export async function POST(request: NextRequest) {
     console.log('🔍 RAW TAGS:', order.tags);
     console.log('🔍 TAG TYPE:', typeof order.tags);
 
-    // Normalize entire tag string to lowercase for matching
-    const tagString = (order.tags || '').toLowerCase();
+    // If tags are empty or missing, wait 30 seconds and re-fetch from Shopify API
+    // This handles Shopify Flow adding tags after webhook fires
+    let finalOrder = order;
+    if (!order.tags || order.tags.trim() === '') {
+      console.log('⏳ No tags found, waiting 30 seconds for Shopify Flow to add tags...');
+      
+      await new Promise(resolve => setTimeout(resolve, 30000));
+      
+      // Re-fetch order from Shopify API to get updated tags
+      try {
+        const shopifyUrl = `https://${process.env.SHOPIFY_SHOP_NAME}/admin/api/2024-01/orders/${order.id}.json`;
+        const response = await fetch(shopifyUrl, {
+          headers: {
+            'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN || '',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          finalOrder = data.order;
+          console.log('✅ Re-fetched order from Shopify. New tags:', finalOrder.tags);
+        } else {
+          console.log('⚠️ Could not re-fetch order, using original');
+        }
+      } catch (e) {
+        console.log('⚠️ Error re-fetching order:', e);
+      }
+    }
     
-    console.log('🏷️ RAW tag string:', order.tags);
+    // Normalize entire tag string to lowercase for matching
+    const tagString = (finalOrder.tags || '').toLowerCase();
+    
+    console.log('🏷️ RAW tag string:', finalOrder.tags);
     console.log('🏷️ Normalized:', tagString);
     
     // Determine target column by checking the ENTIRE tag string
