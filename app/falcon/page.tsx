@@ -1992,8 +1992,8 @@ export default function App() {
   };
 
   const header = (
-    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 300 }}>
+    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         {/* Company Logo */}
         <div 
           onClick={() => logoInputRef.current?.click()}
