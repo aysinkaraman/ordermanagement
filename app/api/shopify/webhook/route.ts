@@ -57,57 +57,37 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Check tags - priority has highest precedence, stop after first match
-    // IMPORTANT: Check in EXACT priority order - first match wins
+    // Check ALL tags first, then decide based on priority
+    // Priority is only checked first, all other tags are evaluated together
     
-    // Only proceed if tags exist (even if empty array, we'll use default)
     if (tags && tags.length > 0) {
       console.log('🏷️ Checking tags:', tags.join(', '));
       
-      // 1. PRIORITY - Highest priority, check FIRST and STOP
-      for (const tag of tags) {
-        if (tag.includes('priority')) {
-          targetColumn = 'Priority';
-          foundTag = true;
-          console.log('🔥 PRIORITY tag matched:', tag, '→ Priority list');
-          break;
-        }
-      }
+      // Check what tags exist
+      const hasPriority = tags.some(t => t.includes('priority'));
+      const hasExpress = tags.some(t => t.includes('express'));
+      const hasPickup = tags.some(t => t.includes('shop location') || t.includes('pickup'));
+      const hasShipping = tags.some(t => t.includes('free ground shipping') || t.includes('ground shipping') || t.includes('shipping'));
       
-      // 2. EXPRESS - Only if no priority tag found
-      if (!foundTag) {
-        for (const tag of tags) {
-          if (tag.includes('express')) {
-            targetColumn = 'Express';
-            foundTag = true;
-            console.log('⚡ EXPRESS tag matched:', tag, '→ Express list');
-            break;
-          }
-        }
-      }
+      console.log('📊 Tag check results:', { hasPriority, hasExpress, hasPickup, hasShipping });
       
-      // 3. PICKUP (shop location) - Check BEFORE shipping to avoid false matches
-      if (!foundTag) {
-        for (const tag of tags) {
-          if (tag.includes('shop location') || tag.includes('pickup')) {
-            targetColumn = 'Pickup';
-            foundTag = true;
-            console.log('📍 PICKUP tag matched:', tag, '→ Pickup list');
-            break;
-          }
-        }
-      }
-      
-      // 4. GROUND SHIPPING VARIANTS - Check after pickup
-      if (!foundTag) {
-        for (const tag of tags) {
-          if (tag.includes('free ground shipping') || tag.includes('ground shipping') || tag.includes('shipping')) {
-            targetColumn = 'Ground';
-            foundTag = true;
-            console.log('🚚 GROUND/SHIPPING tag matched:', tag, '→ Ground list');
-            break;
-          }
-        }
+      // Apply priority rules - only Priority has precedence, rest are equal
+      if (hasPriority) {
+        targetColumn = 'Priority';
+        foundTag = true;
+        console.log('🔥 PRIORITY tag found → Priority list');
+      } else if (hasExpress) {
+        targetColumn = 'Express';
+        foundTag = true;
+        console.log('⚡ EXPRESS tag found → Express list');
+      } else if (hasPickup) {
+        targetColumn = 'Pickup';
+        foundTag = true;
+        console.log('📍 PICKUP tag found → Pickup list');
+      } else if (hasShipping) {
+        targetColumn = 'Ground';
+        foundTag = true;
+        console.log('🚚 SHIPPING tag found → Ground list');
       }
     }
     
