@@ -64,10 +64,15 @@ export async function POST(request: NextRequest) {
         isPublic: isPublic || false,
         ownerId: userId
       },
-      include: {
-        owner: {
-          select: { id: true, name: true, email: true, avatar: true }
-        }
+      select: {
+        id: true,
+        title: true,
+        isPublic: true,
+        ownerId: true,
+        teamId: true,
+        createdAt: true,
+        updatedAt: true,
+        owner: { select: { id: true, name: true, email: true, avatar: true } }
       }
     });
 
