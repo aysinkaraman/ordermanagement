@@ -2079,10 +2079,7 @@ export default function App() {
             alignItems: 'center',
             gap: 6,
           }}
-          title="Import orders from Shopify"
-        >
-          🛒 Import Shopify Orders
-        </button>
+        {/* Import Shopify Orders button removed: handled by webhook */}
 
         <button
           onClick={() => {
