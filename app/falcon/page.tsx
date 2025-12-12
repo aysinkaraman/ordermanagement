@@ -456,7 +456,10 @@ export default function App() {
     try {
       const response = await fetch('/api/boards', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
         body: JSON.stringify({ title: newBoardTitle, isPublic: false }),
       });
 
@@ -497,7 +500,10 @@ export default function App() {
       if (!boardId) {
         const boardRes = await fetch('/api/boards', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+          },
           body: JSON.stringify({ title: 'My Kanban Board', isPublic: false }),
         });
         const board = await boardRes.json();
