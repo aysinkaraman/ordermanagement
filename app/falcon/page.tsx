@@ -155,7 +155,8 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string>('');
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -248,6 +249,19 @@ export default function App() {
     '#FFF6D6', // light yellow
     '#FFD6F6', // magenta
     '#D6FFF9', // aqua
+  ];
+
+  const pastelPaletteDark = [
+    '#3b1f2b', // dark pink
+    '#1f2b3b', // dark blue
+    '#3b3b1f', // dark yellow
+    '#1f3b2b', // dark green
+    '#2b1f3b', // dark purple
+    '#3b2b1f', // dark orange
+    '#1f3b3a', // dark teal
+    '#3a3b1f', // dark light yellow
+    '#3b1f3a', // dark magenta
+    '#1f3b39', // dark aqua
   ];
 
   // Load user from localStorage
@@ -1086,11 +1100,11 @@ export default function App() {
         onDragOver={handleColumnDragOver}
         onDrop={(e) => handleColumnDrop(e, col.id)}
         style={{
-          background: pastelPalette[(columns.findIndex(c => c.id === col.id)) % pastelPalette.length],
+          background: (darkMode ? pastelPaletteDark : pastelPalette)[(columns.findIndex(c => c.id === col.id)) % pastelPalette.length],
           borderRadius: 10,
           boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
-          padding: 10,
-          width: 280,
+          padding: compactView ? 8 : 10,
+          width: compactView ? 250 : 280,
           flexShrink: 0,
           position: 'relative',
         }}
@@ -1110,7 +1124,7 @@ export default function App() {
             cursor: !showArchived ? 'grab' : 'default'
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{col.name}</div>
+          <div style={{ fontWeight: 600, fontSize: compactView ? 13 : 14 }}>{col.name}</div>
           <div style={{ display: 'flex', gap: 4 }}>
             {!showArchived && (
               <>
@@ -1726,7 +1740,7 @@ export default function App() {
   };
 
   const header = (
-    <div style={{ padding: '16px 24px', background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ padding: compactView ? '10px 16px' : '16px 24px', background: darkMode ? '#111827' : `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         {/* Company Logo */}
         <div 
@@ -2029,8 +2043,8 @@ export default function App() {
             padding: '8px 16px',
             borderRadius: 6,
             border: 'none',
-            background: showThemePicker ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
-            color: showThemePicker ? '#92400E' : '#fff',
+            background: darkMode ? (showThemePicker ? '#374151' : '#1f2937') : (showThemePicker ? '#FEF3C7' : 'rgba(255,255,255,0.2)'),
+            color: '#fff',
             cursor: 'pointer',
             fontSize: 13,
             fontWeight: 600,
@@ -2041,6 +2055,26 @@ export default function App() {
           title="Customize Theme"
         >
           🎨 Theme
+        </button>
+
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: darkMode ? '#111827' : 'rgba(255,255,255,0.2)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Toggle dark mode"
+        >
+          {darkMode ? '🌙 Dark' : '☀️ Light'}
         </button>
 
         {/* Import Shopify Orders button removed: handled by webhook */}
