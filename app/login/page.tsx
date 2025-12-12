@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,14 +11,7 @@ export default function LoginPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [buildInfo, setBuildInfo] = useState<{ sha?: string; ref?: string; env?: string } | null>(null);
-
-  useEffect(() => {
-    fetch('/api/version')
-      .then(r => r.json())
-      .then(data => setBuildInfo({ sha: data.sha, ref: data.ref, env: data.env }))
-      .catch(() => setBuildInfo(null));
-  }, []);
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,21 +87,7 @@ export default function LoginPage() {
           }}>
             Falcon Board
           </h1>
-          {buildInfo?.sha && (
-            <a href="/api/version" target="_blank" rel="noreferrer" style={{
-              display: 'inline-block',
-              marginTop: '6px',
-              fontSize: '12px',
-              fontWeight: 600,
-              background: '#edf2f7',
-              color: '#2d3748',
-              padding: '2px 6px',
-              borderRadius: 6,
-              textDecoration: 'none',
-            }}>
-              {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {(buildInfo.sha || '').slice(0,7)}
-            </a>
-          )}
+          
           <p style={{
             color: '#718096',
             fontSize: '14px',

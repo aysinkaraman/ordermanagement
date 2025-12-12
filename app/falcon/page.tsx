@@ -126,7 +126,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(true);
-  const [buildInfo, setBuildInfo] = useState<{ sha?: string; ref?: string; env?: string } | null>(null);
 
   const [newColumnName, setNewColumnName] = useState('');
   const [columnSaving, setColumnSaving] = useState(false);
@@ -200,13 +199,19 @@ export default function App() {
   const [teamEmail, setTeamEmail] = useState('');
   const [teamMemberRole, setTeamMemberRole] = useState('member');
 
-  useEffect(() => {
-    // Lightweight build version fetch for header badge
-    fetch('/api/version')
-      .then(r => r.json())
-      .then(data => setBuildInfo({ sha: data.sha, ref: data.ref, env: data.env }))
-      .catch(() => setBuildInfo(null));
-  }, []);
+  const loadBoardById = async (boardId: string) => {
+    try {
+      const res = await fetch(`/api/boards/${boardId}`);
+      const board = await res.json();
+      if (!res.ok) throw new Error(board.error || 'Failed to load board');
+      const cols = (board.columns || []).map((c: any) => ({ id: c.id, name: c.title, cards: (c.cards || []).map((card: any) => ({ id: card.id, columnId: c.id, orderNumber: card.title })) }));
+      setColumns(cols);
+      setBoardTitle(board.title || 'Falcon Board');
+      setCurrentBoardId(board.id);
+    } catch (e) {
+      console.error('Load board failed', e);
+    }
+  };
   
   const themePresets = [
     { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
@@ -478,7 +483,7 @@ export default function App() {
       setCompanyLogo(localStorage.getItem('companyLogo'));
       loadBoardMembers(newBoard.id);
       setShowBoardSelector(false);
-      window.location.reload();
+      await loadBoardById(newBoard.id);
     } catch (e: any) {
       console.error('Create board error:', e);
       alert(`❌ ${e.message || 'Failed to create board'}`);
@@ -1897,21 +1902,6 @@ export default function App() {
               title="Click to edit"
             >
               {boardTitle}
-              {buildInfo?.sha && (
-                <a href="/api/version" target="_blank" rel="noreferrer" style={{
-                  marginLeft: 8,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: 'rgba(255,255,255,0.2)',
-                  color: '#fff',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                }}>
-                  {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {(buildInfo.sha || '').slice(0,7)}
-                </a>
-              )}
             </div>
           )}
         </div>
