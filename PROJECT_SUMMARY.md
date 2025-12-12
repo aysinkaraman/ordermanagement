@@ -1,5 +1,5 @@
 # Kanban Board - Complete Codebase Summary
-
+Note: Deployment trigger check — minor doc touch-up to initiate CI.
 ## 📦 Deliverables
 
 This is a **production-ready** Trello-like Kanban board application with all requested features fully implemented.
