@@ -23,7 +23,8 @@ export async function POST(
           { ownerId: userId },
           { members: { some: { userId, role: { in: ['owner', 'admin'] } } } }
         ]
-      }
+      },
+      select: { id: true, ownerId: true }
     });
 
     if (!board) {
@@ -120,7 +121,8 @@ export async function GET(
           { members: { some: { userId } } },
           { isPublic: true }
         ]
-      }
+      },
+      select: { id: true }
     });
 
     if (!board) {

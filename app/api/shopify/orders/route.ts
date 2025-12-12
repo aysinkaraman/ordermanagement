@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
           { ownerId: userId },
           { members: { some: { userId } } }
         ]
-      }
+      },
+      select: { id: true, title: true, ownerId: true }
     });
 
     if (!board) {

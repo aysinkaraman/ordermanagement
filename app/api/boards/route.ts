@@ -18,20 +18,25 @@ export async function GET(request: NextRequest) {
           { members: { some: { userId } } }
         ]
       },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        isPublic: true,
+        ownerId: true,
+        teamId: true,
+        createdAt: true,
+        updatedAt: true,
         owner: {
           select: { id: true, name: true, email: true, avatar: true }
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, avatar: true }
-            }
+          select: {
+            id: true,
+            role: true,
+            user: { select: { id: true, name: true, email: true, avatar: true } }
           }
         },
-        _count: {
-          select: { columns: true, members: true }
-        }
+        _count: { select: { columns: true, members: true } }
       },
       orderBy: { updatedAt: 'desc' }
     });

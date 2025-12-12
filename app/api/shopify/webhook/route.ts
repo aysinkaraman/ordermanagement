@@ -114,7 +114,15 @@ export async function POST(request: NextRequest) {
     // Always use the first available board - simpler and more reliable
     console.log('📋 Finding first available board...');
     const board = await prisma.board.findFirst({
-      include: { columns: { orderBy: { order: 'asc' } } },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        columns: {
+          select: { id: true, title: true, order: true },
+          orderBy: { order: 'asc' }
+        }
+      },
       orderBy: { createdAt: 'asc' }
     });
 

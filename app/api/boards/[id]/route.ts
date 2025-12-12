@@ -22,23 +22,48 @@ export async function GET(
           { isPublic: true }
         ]
       },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        isPublic: true,
+        ownerId: true,
+        teamId: true,
+        createdAt: true,
+        updatedAt: true,
         owner: {
           select: { id: true, name: true, email: true, avatar: true }
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, avatar: true }
-            }
+          select: {
+            id: true,
+            role: true,
+            user: { select: { id: true, name: true, email: true, avatar: true } }
           }
         },
         columns: {
           where: { isArchived: false },
-          include: {
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            isArchived: true,
+            createdAt: true,
+            updatedAt: true,
             cards: {
               where: { isArchived: false },
-              orderBy: { order: 'asc' }
+              orderBy: { order: 'asc' },
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+                isArchived: true,
+                dueDate: true,
+                coverImage: true,
+                labels: true,
+              }
             }
           },
           orderBy: { order: 'asc' }

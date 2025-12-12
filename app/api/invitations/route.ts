@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
       // If user exists, add them directly
       if (boardId) {
         const board = await prisma.board.findFirst({
-          where: { id: boardId, OR: [{ ownerId: userId }, { members: { some: { userId, role: { in: ['owner', 'admin'] } } } }] }
+          where: { id: boardId, OR: [{ ownerId: userId }, { members: { some: { userId, role: { in: ['owner', 'admin'] } } } }] },
+          select: { id: true, ownerId: true }
         });
         if (!board) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 

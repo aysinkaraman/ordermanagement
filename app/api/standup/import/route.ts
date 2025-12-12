@@ -33,9 +33,9 @@ function parseTagMap(): TagMap {
 
 async function ensureStandupBoard(userId: string) {
   const title = 'Daily Standup';
-  let board = await prisma.board.findFirst({ where: { title } });
+  let board = await prisma.board.findFirst({ where: { title }, select: { id: true, title: true, ownerId: true } });
   if (!board) {
-    board = await prisma.board.create({ data: { title, isPublic: false, ownerId: userId } });
+    board = await prisma.board.create({ data: { title, isPublic: false, ownerId: userId }, select: { id: true, title: true, ownerId: true } });
   }
   return board;
 }

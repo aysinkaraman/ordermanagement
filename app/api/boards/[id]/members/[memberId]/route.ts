@@ -21,7 +21,8 @@ export async function DELETE(
           { ownerId: userId },
           { members: { some: { userId, role: { in: ['owner', 'admin'] } } } }
         ]
-      }
+      },
+      select: { id: true, ownerId: true }
     });
 
     if (!board) {
