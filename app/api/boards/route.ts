@@ -71,23 +71,47 @@ export async function POST(request: NextRequest) {
 
     const { title, isPublic } = await request.json();
 
-    const board = await prisma.board.create({
-      data: {
-        title: title || 'My Kanban Board',
-        isPublic: isPublic || false,
-        ownerId: userId
-      },
-      select: {
-        id: true,
-        title: true,
-        isPublic: true,
-        ownerId: true,
-        teamId: true,
-        createdAt: true,
-        updatedAt: true,
-        owner: { select: { id: true, name: true, email: true, avatar: true } }
+    let board;
+    try {
+      board = await prisma.board.create({
+        data: {
+          title: title || 'My Kanban Board',
+          isPublic: isPublic || false,
+          ownerId: userId
+        },
+        select: {
+          id: true,
+          title: true,
+          isPublic: true,
+          ownerId: true,
+          teamId: true,
+          createdAt: true,
+          updatedAt: true,
+          owner: { select: { id: true, name: true, email: true, avatar: true } }
+        }
+      });
+    } catch (err: any) {
+      // Fallback for prod DB missing extra columns (e.g., primaryColor)
+      if (err?.code === 'P2022') {
+        const _title = title || 'My Kanban Board';
+        const _isPublic = !!isPublic;
+        const result = await prisma.$queryRawUnsafe<any[]>(
+          'INSERT INTO "Board" ("title", "isPublic", "ownerId") VALUES ($1, $2, $3) RETURNING "id", "title", "isPublic", "ownerId", "teamId", "createdAt", "updatedAt"',
+          _title,
+          _isPublic,
+          userId
+        );
+        const row = result?.[0];
+        if (row) {
+          const owner = await prisma.user.findUnique({ where: { id: row.ownerId }, select: { id: true, name: true, email: true, avatar: true } });
+          board = { ...row, owner } as any;
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
       }
-    });
+    }
 
     return NextResponse.json(board);
   } catch (error) {
