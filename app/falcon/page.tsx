@@ -208,10 +208,21 @@ export default function App() {
       setColumns(cols);
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
+      try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
       console.error('Load board failed', e);
     }
   };
+
+  useEffect(() => {
+    // Auto-load last selected board if present
+    try {
+      const lastId = localStorage.getItem('lastBoardId');
+      if (lastId) {
+        loadBoardById(lastId);
+      }
+    } catch {}
+  }, []);
   
   const themePresets = [
     { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
@@ -484,6 +495,7 @@ export default function App() {
       loadBoardMembers(newBoard.id);
       setShowBoardSelector(false);
       await loadBoardById(newBoard.id);
+      try { localStorage.setItem('lastBoardId', newBoard.id); } catch {}
     } catch (e: any) {
       console.error('Create board error:', e);
       alert(`❌ ${e.message || 'Failed to create board'}`);
@@ -3022,6 +3034,7 @@ export default function App() {
                   await loadBoardById(board.id);
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
+                  try { localStorage.setItem('lastBoardId', board.id); } catch {}
                 }}
                 style={{
                   padding: 16,
