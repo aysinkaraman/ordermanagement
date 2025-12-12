@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,39 +8,39 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  columns         Column[]
-  cards           Card[]
-  comments        Comment[]
+  id              String        @id @default(cuid())
+  email           String        @unique
+  password        String
+  name            String
+  avatar          String?
+  companyLogo     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   activities      Activity[]
-  ownedBoards     Board[]  @relation("BoardOwner")
+  ownedBoards     Board[]       @relation("BoardOwner")
   boardMembers    BoardMember[]
-  ownedTeams      Team[]   @relation("TeamOwner")
+  cards           Card[]
+  columns         Column[]
+  comments        Comment[]
+  sentInvitations Invitation[]  @relation("InvitationSender")
+  ownedTeams      Team[]        @relation("TeamOwner")
   teamMembers     TeamMember[]
-  sentInvitations Invitation[] @relation("InvitationSender")
 
   @@index([email])
 }
 
 model Invitation {
-  id         String   @id @default(cuid())
-  email      String
-  token      String   @unique
-  boardId    String?
-  teamId     String?
-  role       String   @default("member")
-  senderId   String
-  sender     User     @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
-  accepted   Boolean  @default(false)
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  boardId   String?
+  teamId    String?
+  role      String   @default("member")
+  senderId  String
+  accepted  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  sender    User     @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([token])
@@ -52,16 +49,16 @@ model Invitation {
 }
 
 model Team {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   description String?
   avatar      String?
   ownerId     String
-  owner       User     @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members     TeamMember[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   boards      Board[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
 
   @@index([ownerId])
 }
@@ -69,11 +66,11 @@ model Team {
 model TeamMember {
   id        String   @id @default(cuid())
   teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      String   @default("member") // "owner", "admin", "member"
+  role      String   @default("member")
   createdAt DateTime @default(now())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@index([teamId])
@@ -81,17 +78,20 @@ model TeamMember {
 }
 
 model Board {
-  id          String   @id @default(cuid())
-  title       String   @default("My Kanban Board")
-  isPublic    Boolean  @default(false)
-  teamId      String?
-  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  ownerId     String
-  owner       User     @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  columns     Column[]
-  members     BoardMember[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String        @id @default(cuid())
+  title          String        @default("My Kanban Board")
+  isPublic       Boolean       @default(false)
+  ownerId        String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  teamId         String?
+  logo           String?
+  primaryColor   String        @default("#D97706")
+  secondaryColor String        @default("#92400E")
+  owner          User          @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  team           Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  members        BoardMember[]
+  columns        Column[]
 
   @@index([ownerId])
   @@index([teamId])
@@ -101,11 +101,11 @@ model Board {
 model BoardMember {
   id        String   @id @default(cuid())
   boardId   String
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      String   @default("member") // "owner", "admin", "member"
+  role      String   @default("member")
   createdAt DateTime @default(now())
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([boardId, userId])
   @@index([boardId])
@@ -116,14 +116,15 @@ model Column {
   id         String   @id @default(cuid())
   title      String
   order      Int
-  isArchived Boolean  @default(false)
-  boardId    String?
-  board      Board?   @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  cards      Card[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  isArchived Boolean  @default(false)
+  userId     String?
+  boardId    String?
+  color      String?
+  cards      Card[]
+  board      Board?   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id])
 
   @@index([order])
   @@index([isArchived])
@@ -134,21 +135,21 @@ model Column {
 model Card {
   id          String       @id @default(cuid())
   columnId    String
-  column      Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
   title       String
   description String?
   order       Int
-  isArchived  Boolean      @default(false)
-  dueDate     DateTime?
-  labels      String[]     @default([])
-  coverImage  String?
-  userId      String?
-  user        User?        @relation(fields: [userId], references: [id])
-  comments    Comment[]
-  activities  Activity[]
-  attachments Attachment[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  isArchived  Boolean      @default(false)
+  coverImage  String?
+  dueDate     DateTime?
+  labels      String[]     @default([])
+  userId      String?
+  activities  Activity[]
+  attachments Attachment[]
+  column      Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id])
+  comments    Comment[]
 
   @@index([columnId])
   @@index([order])
@@ -160,11 +161,11 @@ model Card {
 model Comment {
   id        String   @id @default(cuid())
   cardId    String
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   text      String
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+  userId    String?
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([cardId])
   @@index([userId])
@@ -173,11 +174,11 @@ model Comment {
 model Activity {
   id        String   @id @default(cuid())
   cardId    String
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   message   String
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+  userId    String?
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([cardId])
   @@index([createdAt])
@@ -187,13 +188,13 @@ model Activity {
 model Attachment {
   id        String   @id @default(cuid())
   cardId    String
-  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   filename  String
   url       String
   size      Int
   mimeType  String
-  note      String?
   createdAt DateTime @default(now())
+  note      String?
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
 }

@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { name, avatar } = await request.json();
+    const { name, avatar, companyLogo } = await request.json();
 
     // Validation
     if (!name || name.trim().length === 0) {
@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest) {
       data: {
         name: name.trim(),
         avatar: avatar || null,
+        ...(companyLogo !== undefined && { companyLogo: companyLogo || null }),
       },
     });
 

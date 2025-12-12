@@ -269,7 +269,9 @@ export default function App() {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
-        setCurrentUser(JSON.parse(userStr));
+        const parsed = JSON.parse(userStr);
+        setCurrentUser(parsed);
+        if (parsed?.companyLogo) setCompanyLogo(parsed.companyLogo);
       } catch (e) {
         console.error('Failed to parse user', e);
       }
@@ -1673,9 +1675,24 @@ export default function App() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
-      setCompanyLogo(reader.result as string);
-      localStorage.setItem('companyLogo', reader.result as string);
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setCompanyLogo(dataUrl);
+      localStorage.setItem('companyLogo', dataUrl);
+      try {
+        const resp = await fetch('/api/auth/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyLogo: dataUrl }),
+        });
+        if (resp.ok) {
+          const updatedUser = await resp.json();
+          setCurrentUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+      } catch (err) {
+        console.error('Failed to persist company logo', err);
+      }
     };
     reader.readAsDataURL(file);
 
@@ -1702,7 +1719,7 @@ export default function App() {
     const savedPrimaryColor = localStorage.getItem('primaryColor');
     const savedSecondaryColor = localStorage.getItem('secondaryColor');
     
-    if (savedLogo) setCompanyLogo(savedLogo);
+    if (!companyLogo && savedLogo) setCompanyLogo(savedLogo);
     if (savedCompanyName) setCompanyName(savedCompanyName);
     if (savedBoardTitle) setBoardTitle(savedBoardTitle);
     if (savedPrimaryColor) setPrimaryColor(savedPrimaryColor);
