@@ -438,19 +438,43 @@ export const CardModal: React.FC<CardModalProps> = ({
           {/* Activity Log Section */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Activity</h3>
-
             <div className="space-y-2">
               {activities.length === 0 ? (
                 <p className="text-gray-500 text-sm">No activity yet</p>
               ) : (
-                activities.map((activity) => (
-                  <div key={activity.id} className="text-sm text-gray-600">
-                    <span className="font-medium">{activity.message}</span>
-                    <span className="text-gray-400 ml-2">
-                      {formatDate(activity.createdAt)}
-                    </span>
-                  </div>
-                ))
+                activities.map((activity) => {
+                  // activity.user: { id, name, avatar } | undefined
+                  const user = (activity as any).user;
+                  return (
+                    <div key={activity.id} className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {user && user.avatar ? (
+                          <img
+                            src={user.avatar}
+                            alt={user.name || 'User'}
+                            className="w-8 h-8 rounded-full object-cover border"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-500 text-base font-bold border">
+                            {user && user.name ? user.name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                        )}
+                      </div>
+                      {/* User name and message */}
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-gray-800">
+                          {user && user.name ? user.name : 'Unknown User'}
+                        </span>
+                        <span className="ml-1 text-gray-600">{activity.message}</span>
+                      </div>
+                      {/* Date */}
+                      <span className="text-gray-400 ml-2 whitespace-nowrap">
+                        {formatDate(activity.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

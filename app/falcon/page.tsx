@@ -114,6 +114,11 @@ type Column = {
   cards: Card[];
 };
 
+type ColumnSettings = {
+  color?: string | null;
+  sortDirection?: 'asc' | 'desc';
+};
+
 type User = {
   id: number;
   email: string;
@@ -150,10 +155,11 @@ export default function App() {
   const [draggingColumnId, setDraggingColumnId] = useState<string | number | null>(null);
   const [openListMenuId, setOpenListMenuId] = useState<string | number | null>(null);
   const [openSortMenuId, setOpenSortMenuId] = useState<string | number | null>(null);
+  const [columnSettings, setColumnSettings] = useState<Record<string | number, ColumnSettings>>({});
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
-  const compactView = false; // Always use comfortable view
+  const [compactView, setCompactView] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string>('');
   const [globalSearch, setGlobalSearch] = useState<string>('');
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -235,6 +241,22 @@ export default function App() {
     cards: (apiCol.cards || []).map(mapApiCard),
   });
 
+  const colorPalette = [
+    '#FF6B6B',
+    '#4ECDC4',
+    '#45B7D1',
+    '#FFA07A',
+    '#98D8C8',
+    '#F7DC6F',
+    '#BB8FCE',
+    '#85C1E2',
+    '#F8B88B',
+    '#FFB6D9',
+    '#B4E7CE',
+    '#DDA0DD',
+    '#90EE90',
+  ];
+
   // Load user from localStorage
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -260,27 +282,18 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load columns for current board (with boardId filter)
+  // Initial load
   useEffect(() => {
     let mounted = true;
-    
-    // Don't load if no board selected
-    if (!currentBoardId) {
-      console.log('⚠️ No board selected, skipping column load');
-      return;
-    }
-    
     (async () => {
       try {
         setLoading(true);
-        let url = `/api/columns?boardId=${currentBoardId}`;
+        let url = '/api/columns';
         if (showArchived) {
-          url = `/api/columns?boardId=${currentBoardId}&archived=true&mode=${archiveMode}`;
+          url = `/api/columns?archived=true&mode=${archiveMode}`;
         }
-        console.log('📂 Loading columns for board:', currentBoardId);
         const res = await fetch(url);
         const data = await res.json();
-        console.log('✅ Columns loaded:', data?.length || 0);
         if (mounted) setColumns((data || []).map(mapApiColumn));
       } catch (e) {
         console.error('Failed to load columns', e);
@@ -292,7 +305,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [currentBoardId, showArchived, archiveMode]);
+  }, [showArchived, archiveMode]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -331,22 +344,14 @@ export default function App() {
   const handleAddColumn = async () => {
     const name = newColumnName.trim();
     if (!name) return;
-    
-    if (!currentBoardId) {
-      alert('Please select a board first');
-      return;
-    }
-    
     setColumnSaving(true);
     try {
-      console.log('➕ Creating column:', name, 'in board:', currentBoardId);
       const res = await fetch('/api/columns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: name, boardId: currentBoardId }),
+        body: JSON.stringify({ title: name }),
       });
       const created = await res.json();
-      console.log('✅ Column created:', created);
       const mapped = mapApiColumn(created);
       setColumns((prev) => [...prev, mapped]);
       setNewColumnName('');
@@ -623,88 +628,14 @@ export default function App() {
     try {
       const res = await fetch('/api/boards');
       const data = await res.json();
-      console.log('📋 Loaded boards:', data?.map((b: any) => b.title));
       setBoards(data || []);
-      
-      if (!data || data.length === 0) return;
-      
-      // Try to restore last selected board from localStorage
-      const savedBoardId = typeof window !== 'undefined' ? localStorage.getItem('selectedBoardId') : null;
-      let targetBoard = null;
-      
-      if (savedBoardId) {
-        targetBoard = data.find((b: any) => b.id === savedBoardId);
-        console.log('💾 Restoring saved board:', targetBoard?.title || 'not found');
-      }
-      
-      // Fallback to first board if saved board not found
-      if (!targetBoard) {
-        targetBoard = data[0];
-        console.log('📌 Using first board:', targetBoard.title);
-      }
-      
-      // Set the board (will trigger column load via useEffect)
-      setCurrentBoardId(targetBoard.id);
-      setBoardTitle(targetBoard.title || 'Falcon Board');
-      loadBoardMembers(targetBoard.id);
-      
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('selectedBoardId', targetBoard.id);
-        console.log('💾 Saved board to localStorage:', targetBoard.id);
+      if (data && data.length > 0 && !currentBoardId) {
+        setCurrentBoardId(data[0].id);
+        setBoardTitle(data[0].title || 'Falcon Board');
+        loadBoardMembers(data[0].id);
       }
     } catch (e) {
       console.error('Failed to load boards', e);
-    }
-  };
-
-  // Refresh board data (cards only, preserve column order)
-  const refreshBoardData = async () => {
-    if (!currentBoardId) {
-      console.log('⚠️ No currentBoardId, skipping refresh');
-      return;
-    }
-    
-    try {
-      console.log('🔄 Refreshing board:', currentBoardId);
-      const res = await fetch(`/api/boards/${currentBoardId}`);
-      if (!res.ok) {
-        console.error('Failed to fetch board:', res.status);
-        return;
-      }
-      
-      const board = await res.json();
-      console.log('✅ Board data received:', board.title, '- Columns:', board.columns?.length);
-      
-      // Only update if we're still on the same board
-      if (board.id === currentBoardId && board.columns) {
-        // IMPORTANT: Preserve current column order, only update cards
-        setColumns(prevColumns => {
-          const newColumnsFromApi = board.columns.map(mapApiColumn);
-          
-          // If we have existing columns with custom order, merge cards but keep order
-          if (prevColumns.length > 0) {
-            return prevColumns.map(prevCol => {
-              const updatedCol = newColumnsFromApi.find((c: Column) => c.id === prevCol.id);
-              if (updatedCol) {
-                // Keep the column but update its cards
-                return {
-                  ...prevCol,
-                  cards: updatedCol.cards,
-                };
-              }
-              return prevCol;
-            });
-          }
-          
-          // First load - use API order
-          return newColumnsFromApi;
-        });
-      } else {
-        console.log('⚠️ Board ID mismatch, not updating');
-      }
-    } catch (e) {
-      console.error('Failed to refresh board', e);
     }
   };
 
@@ -713,22 +644,6 @@ export default function App() {
     loadBoards();
     loadTeams();
   }, []);
-
-  // Auto-refresh every 5 seconds when board is active
-  useEffect(() => {
-    if (!currentBoardId) return;
-
-    // Initial refresh
-    refreshBoardData();
-
-    // Set up interval
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing board data...');
-      refreshBoardData();
-    }, 5000); // 5 seconds
-
-    return () => clearInterval(interval);
-  }, [currentBoardId]);
 
   const handleArchiveColumn = async (columnId: string | number) => {
     if (!window.confirm('Are you sure you want to archive this list? All cards will be archived too.')) return;
@@ -827,26 +742,7 @@ export default function App() {
   };
 
   // Modal control
-  const openCardModal = async (card: Card) => {
-    try {
-      const res = await fetch(`/api/cards/${card.id}`);
-      if (res.ok) {
-        const apiCard = await res.json();
-        setActiveCard(mapApiCard(apiCard));
-        setDescriptionDraft(apiCard.description || '');
-        setAttachmentNotes(() => {
-          const next: Record<string | number, string> = {};
-          (apiCard.attachments || []).forEach((att: any) => {
-            next[att.id] = att.note || '';
-          });
-          return next;
-        });
-        return;
-      }
-    } catch (e) {
-      console.error('Failed to fetch card details', e);
-    }
-    // fallback to local card if API fails
+  const openCardModal = (card: Card) => {
     setActiveCard(card);
     setDescriptionDraft(card.customerName || '');
     setAttachmentNotes(() => {
@@ -1037,15 +933,12 @@ export default function App() {
     if (draggingColumnId) e.preventDefault();
   };
 
-  const handleColumnDrop = async (e: React.DragEvent, targetColumnId: string | number) => {
+  const handleColumnDrop = (e: React.DragEvent, targetColumnId: string | number) => {
     e.preventDefault();
     if (!draggingColumnId || draggingColumnId === targetColumnId) {
       setDraggingColumnId(null);
       return;
     }
-    
-    let newColumns: Column[] = [];
-    
     setColumns((prev) => {
       const next = [...prev];
       const fromIdx = next.findIndex((c) => c.id === draggingColumnId);
@@ -1053,38 +946,21 @@ export default function App() {
       if (fromIdx === -1 || toIdx === -1) return prev;
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      newColumns = next;
       return next;
     });
-    
     setDraggingColumnId(null);
-    
-    // Save new order to database
-    try {
-      console.log('💾 Saving column order after drag-drop');
-      await Promise.all(newColumns.map((c, i) => 
-        fetch(`/api/columns/${c.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order: i }),
-        })
-      ));
-      console.log('✅ Column order saved');
-    } catch (e) {
-      console.error('❌ Failed to save column order:', e);
-    }
   };
 
   // List Actions
-  const sortColumnCards = async (columnId: string | number, sortType: 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest') => {
-    let sortedCards: Card[] = [];
+  const sortColumnCards = (columnId: string | number, sortType: 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest') => {
     setColumns((prev) =>
       prev.map((col) => {
         if (col.id !== columnId) return col;
-        sortedCards = [...(col.cards || [])].sort((a, b) => {
+        const sorted = [...(col.cards || [])].sort((a, b) => {
           switch (sortType) {
             case 'name-asc':
             case 'name-desc': {
+              // Sort by card name (orderNumber)
               const aNum = parseInt(a.orderNumber, 10);
               const bNum = parseInt(b.orderNumber, 10);
               const aIsNum = !isNaN(aNum);
@@ -1097,6 +973,8 @@ export default function App() {
             }
             case 'date-newest':
             case 'date-oldest': {
+              // Sort by creation date - note: cards don't have createdAt in Card type yet
+              // For now, sort by order which represents creation order
               return sortType === 'date-newest' 
                 ? (b.id as string).localeCompare(a.id as string)
                 : (a.id as string).localeCompare(b.id as string);
@@ -1105,22 +983,17 @@ export default function App() {
               return 0;
           }
         });
-        return { ...col, cards: sortedCards };
+        return { ...col, cards: sorted };
       })
     );
-    // Backend'e sırayı kaydet
-    if (sortedCards.length > 0) {
-      await Promise.all(
-        sortedCards.map((card, idx) =>
-          fetch(`/api/cards/${card.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: idx }),
-          })
-        )
-      );
-    }
     setOpenListMenuId(null);
+  };
+
+  const setColumnColor = (columnId: string | number, color: string | null) => {
+    setColumnSettings((prev) => ({
+      ...prev,
+      [columnId]: { ...(prev[columnId] || {}), color },
+    }));
   };
 
   // Render helpers
@@ -1216,17 +1089,9 @@ export default function App() {
     );
   };
 
-  const getColumnColor = (index: number) => {
-    const colors = [
-      '#FFE5E5', '#E5F5FF', '#FFF4E5', '#E8F5E9', '#F3E5F5',
-      '#FFF9C4', '#E1F5FE', '#FCE4EC', '#F1F8E9', '#E0F2F1'
-    ];
-    return colors[index % colors.length];
-  };
-
   const renderColumn = (col: Column) => {
-    const colIndex = columns.findIndex(c => c.id === col.id);
-    const bg = getColumnColor(colIndex);
+    const settings = columnSettings[col.id] || {};
+    const bg = settings.color || '#f1f2f3';
     const isMenuOpen = openListMenuId === col.id;
     const isAddCardActive = activeAddColumnId === col.id;
 
@@ -1264,90 +1129,6 @@ export default function App() {
           <div style={{ display: 'flex', gap: 4 }}>
             {!showArchived && (
               <>
-                <button 
-                  onClick={async () => {
-                    const currentIndex = columns.findIndex(c => c.id === col.id);
-                    if (currentIndex <= 0) return;
-                    
-                    const newColumns = [...columns];
-                    [newColumns[currentIndex - 1], newColumns[currentIndex]] = [newColumns[currentIndex], newColumns[currentIndex - 1]];
-                    setColumns(newColumns);
-                    
-                    console.log('⬅️ Moving column left:', col.name);
-                    console.log('📊 New order:', newColumns.map((c, i) => `${c.name}:${i}`).join(', '));
-                    
-                    // Save to database
-                    try {
-                      const results = await Promise.all(newColumns.map((c, i) => 
-                        fetch(`/api/columns/${c.id}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ order: i }),
-                        })
-                      ));
-                      
-                      const allOk = results.every(r => r.ok);
-                      if (allOk) {
-                        console.log('✅ Column order saved to database');
-                      } else {
-                        console.error('❌ Some column updates failed');
-                      }
-                    } catch (e) {
-                      console.error('❌ Failed to save column order:', e);
-                    }
-                  }} 
-                  title="Move left"
-                  disabled={columns.findIndex(c => c.id === col.id) === 0}
-                  style={{
-                    ...iconBtnStyle,
-                    opacity: columns.findIndex(c => c.id === col.id) === 0 ? 0.3 : 1,
-                    cursor: columns.findIndex(c => c.id === col.id) === 0 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  ←
-                </button>
-                <button 
-                  onClick={async () => {
-                    const currentIndex = columns.findIndex(c => c.id === col.id);
-                    if (currentIndex >= columns.length - 1) return;
-                    
-                    const newColumns = [...columns];
-                    [newColumns[currentIndex], newColumns[currentIndex + 1]] = [newColumns[currentIndex + 1], newColumns[currentIndex]];
-                    setColumns(newColumns);
-                    
-                    console.log('➡️ Moving column right:', col.name);
-                    console.log('📊 New order:', newColumns.map((c, i) => `${c.name}:${i}`).join(', '));
-                    
-                    // Save to database
-                    try {
-                      const results = await Promise.all(newColumns.map((c, i) => 
-                        fetch(`/api/columns/${c.id}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ order: i }),
-                        })
-                      ));
-                      
-                      const allOk = results.every(r => r.ok);
-                      if (allOk) {
-                        console.log('✅ Column order saved to database');
-                      } else {
-                        console.error('❌ Some column updates failed');
-                      }
-                    } catch (e) {
-                      console.error('❌ Failed to save column order:', e);
-                    }
-                  }} 
-                  title="Move right"
-                  disabled={columns.findIndex(c => c.id === col.id) === columns.length - 1}
-                  style={{
-                    ...iconBtnStyle,
-                    opacity: columns.findIndex(c => c.id === col.id) === columns.length - 1 ? 0.3 : 1,
-                    cursor: columns.findIndex(c => c.id === col.id) === columns.length - 1 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  →
-                </button>
                 <button style={iconBtnStyle} onClick={() => setOpenListMenuId(isMenuOpen ? null : col.id)} title="List actions">
                   ⋯
                 </button>
@@ -1393,7 +1174,26 @@ export default function App() {
               Sort by...
               <span style={{ fontSize: 10 }}>▶</span>
             </div>
-
+            <div style={{ fontSize: 12, color: '#555', margin: '8px 0 4px' }}>Change list color</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
+              {colorPalette.map((c) => (
+                <div
+                  key={c}
+                  onClick={() => setColumnColor(col.id, c)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 4,
+                    background: c,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(0,0,0,0.1)',
+                  }}
+                />
+              ))}
+            </div>
+            <div style={menuItemStyle} onClick={() => setColumnColor(col.id, null)}>
+              Remove color
+            </div>
           </div>
         )}
 
@@ -1420,10 +1220,7 @@ export default function App() {
               Date created (oldest first)
             </div>
             <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-asc'); setOpenSortMenuId(null); }}>
-              Card name (A-Z)
-            </div>
-            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-desc'); setOpenSortMenuId(null); }}>
-              Card name (Z-A)
+              Card name (alphabetically)
             </div>
           </div>
         )}
@@ -1579,10 +1376,6 @@ export default function App() {
     const attachments = activeCard.attachments || [];
     const comments = activeCard.comments || [];
     const activities = activeCard.activities || [];
-    
-    const activeCol = columns.find(c => String(c.id) === String(activeCard.columnId));
-    const colIndex = activeCol ? columns.findIndex(c => c.id === activeCol.id) : 0;
-    const modalBg = getColumnColor(colIndex);
 
     return (
       <div
@@ -1601,7 +1394,7 @@ export default function App() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: modalBg,
+            background: '#fff',
             borderRadius: 12,
             boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
             width: '90%',
@@ -1913,33 +1706,9 @@ export default function App() {
     localStorage.setItem('companyName', companyName);
   };
 
-  const handleBoardTitleSave = async () => {
+  const handleBoardTitleSave = () => {
     setEditingBoardTitle(false);
-    
-    if (!currentBoardId) {
-      alert('No board selected');
-      return;
-    }
-    
-    try {
-      const res = await fetch(`/api/boards/${currentBoardId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: boardTitle }),
-      });
-      
-      if (res.ok) {
-        console.log('✅ Board title saved:', boardTitle);
-        localStorage.setItem('boardTitle', boardTitle);
-      } else {
-        const error = await res.json();
-        console.error('Failed to save board title:', error);
-        alert('Board title could not be saved');
-      }
-    } catch (e) {
-      console.error('Save board title error:', e);
-      alert('Failed to save board title');
-    }
+    localStorage.setItem('boardTitle', boardTitle);
   };
 
   // Load branding and theme from localStorage
@@ -2002,7 +1771,7 @@ export default function App() {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            border: companyLogo ? 'none' : '2px solid rgba(255,255,255,0.3)',
+            border: '2px dashed rgba(255,255,255,0.4)',
             overflow: 'hidden',
             flexShrink: 0
           }}
@@ -2161,6 +1930,27 @@ export default function App() {
           )}
         </div>
 
+        {/* Compact View Toggle */}
+        <button
+          onClick={() => setCompactView(!compactView)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: compactView ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+            color: compactView ? '#92400E' : '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title={compactView ? 'Comfortable View' : 'Compact View'}
+        >
+          {compactView ? '📋 Compact' : '📝 Comfortable'}
+        </button>
+
         {/* Label Filter */}
         {!showArchived && (() => {
           const allLabels = new Set<string>();
@@ -2282,6 +2072,47 @@ export default function App() {
           title="Customize Theme"
         >
           🎨 Theme
+        </button>
+
+        <button
+          onClick={async () => {
+            if (!currentBoardId) {
+              alert('Please create a board first');
+              return;
+            }
+            if (!confirm('Import orders from Shopify? This will create cards for new orders.')) return;
+            
+            try {
+              const res = await fetch(`/api/shopify/orders?boardId=${currentBoardId}`, { method: 'POST' });
+              const data = await res.json();
+              
+              if (!res.ok) {
+                throw new Error(data.error || 'Failed to import orders');
+              }
+              
+              alert(`✅ ${data.imported} orders imported successfully!`);
+              window.location.reload();
+            } catch (e: any) {
+              console.error('Shopify import error:', e);
+              alert(`❌ ${e.message || 'Failed to import from Shopify'}`);
+            }
+          }}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'rgba(147, 51, 234, 0.9)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Import orders from Shopify"
+        >
+          🛒 Import Shopify Orders
         </button>
 
         <button
@@ -3213,38 +3044,13 @@ export default function App() {
             {boards.map((board) => (
               <div
                 key={board.id}
-                onClick={async () => {
-                  console.log('🔀 Switching to board:', board.title, board.id);
-                  
-                  // Load board data first
-                  try {
-                    const res = await fetch(`/api/boards/${board.id}`);
-                    if (res.ok) {
-                      const boardData = await res.json();
-                      console.log('📊 Board data loaded:', boardData.title, '- Columns:', boardData.columns?.length);
-                      
-                      // Update all state together
-                      setCurrentBoardId(board.id);
-                      setBoardTitle(board.title || 'Falcon Board');
-                      
-                      // Save to localStorage
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('selectedBoardId', board.id);
-                        console.log('💾 Saved board to localStorage:', board.id);
-                      }
-                      
-                      if (boardData.columns) {
-                        setColumns(boardData.columns.map(mapApiColumn));
-                      } else {
-                        setColumns([]);
-                      }
-                      
-                      loadBoardMembers(board.id);
-                      setShowBoardSelector(false);
-                    }
-                  } catch (e) {
-                    console.error('Failed to load board', e);
-                  }
+                onClick={() => {
+                  setCurrentBoardId(board.id);
+                  setBoardTitle(board.title || 'Falcon Board');
+                  loadBoardMembers(board.id);
+                  setShowBoardSelector(false);
+                  // Reload board data
+                  window.location.reload();
                 }}
                 style={{
                   padding: 16,
@@ -3269,59 +3075,18 @@ export default function App() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#111827' }}>
                     {board.title || 'Untitled Board'}
                   </h3>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {currentBoardId === board.id && (
-                      <span style={{ 
-                        background: primaryColor, 
-                        color: '#fff', 
-                        padding: '2px 8px', 
-                        borderRadius: 4, 
-                        fontSize: 11, 
-                        fontWeight: 600 
-                      }}>
-                        Active
-                      </span>
-                    )}
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (!confirm(`"${board.title}" board'unu silmek istediğinden emin misin? Bu işlem geri alınamaz!`)) {
-                          return;
-                        }
-                        try {
-                          const res = await fetch(`/api/boards/${board.id}`, { method: 'DELETE' });
-                          if (res.ok) {
-                            alert('✅ Board silindi!');
-                            if (currentBoardId === board.id) {
-                              setCurrentBoardId(null);
-                              setColumns([]);
-                            }
-                            loadBoards();
-                          } else {
-                            const error = await res.json();
-                            alert('❌ Hata: ' + (error.error || 'Board silinemedi'));
-                          }
-                        } catch (err) {
-                          console.error('Delete board error:', err);
-                          alert('❌ Board silinemedi');
-                        }
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 18,
-                        padding: 4,
-                        opacity: 0.6,
-                        transition: 'opacity 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-                      title="Delete Board"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                  {currentBoardId === board.id && (
+                    <span style={{ 
+                      background: primaryColor, 
+                      color: '#fff', 
+                      padding: '2px 8px', 
+                      borderRadius: 4, 
+                      fontSize: 11, 
+                      fontWeight: 600 
+                    }}>
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                   <span>📊 {board._count?.columns || 0} lists</span>

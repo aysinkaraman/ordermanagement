@@ -35,7 +35,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { title, description, columnId, order, isArchived, dueDate, labels, coverImage } = body;
+    const { title, description, columnId, order, isArchived, dueDate, labels, coverImage, userId: userIdFromBody } = body;
 
     const card = await prisma.card.findUnique({
       where: { id: params.id },
@@ -64,7 +64,9 @@ export async function PATCH(
       },
     });
 
-    const userId = getUserIdFromRequest(request);
+    // Use userId from body if provided, else from request (cookie)
+    const userId = userIdFromBody || getUserIdFromRequest(request);
+
 
     // Log activity for title change
     if (title !== undefined && title !== card.title) {
@@ -83,6 +85,17 @@ export async function PATCH(
         data: {
           cardId: params.id,
           message: `Card moved to a different column`,
+          userId,
+        },
+      });
+    }
+
+    // Log activity for order change
+    if (order !== undefined && order !== card.order) {
+      await prisma.activity.create({
+        data: {
+          cardId: params.id,
+          message: `Card order changed to ${order}`,
           userId,
         },
       });
