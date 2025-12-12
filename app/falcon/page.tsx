@@ -126,6 +126,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(true);
+  const [buildInfo, setBuildInfo] = useState<{ sha?: string; ref?: string; env?: string } | null>(null);
 
   const [newColumnName, setNewColumnName] = useState('');
   const [columnSaving, setColumnSaving] = useState(false);
@@ -198,6 +199,14 @@ export default function App() {
   const [teamSaving, setTeamSaving] = useState(false);
   const [teamEmail, setTeamEmail] = useState('');
   const [teamMemberRole, setTeamMemberRole] = useState('member');
+
+  useEffect(() => {
+    // Lightweight build version fetch for header badge
+    fetch('/api/version')
+      .then(r => r.json())
+      .then(data => setBuildInfo({ sha: data.sha, ref: data.ref, env: data.env }))
+      .catch(() => setBuildInfo(null));
+  }, []);
   
   const themePresets = [
     { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
@@ -1882,6 +1891,19 @@ export default function App() {
               title="Click to edit"
             >
               {boardTitle}
+              {buildInfo?.sha && (
+                <span style={{
+                  marginLeft: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                }}>
+                  {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {buildInfo.sha.slice(0,7)}
+                </span>
+              )}
             </div>
           )}
         </div>
