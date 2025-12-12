@@ -13,7 +13,10 @@ export async function GET(
       include: {
         comments: true,
         attachments: true,
-        activities: true,
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, name: true, avatar: true } } },
+        },
       },
     });
 

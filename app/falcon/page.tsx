@@ -1091,6 +1091,7 @@ export default function App() {
   // Render helpers
   const renderCard = (card: Card, columnId: string | number) => {
     const attachmentCount = (card.attachments || []).length;
+    const commentCount = (card.comments || []).length;
     const cardAttachments = card.attachments || [];
     
     // Collect card labels for display
@@ -1128,7 +1129,12 @@ export default function App() {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontWeight: 600, fontSize: compactView ? 12 : 13 }}>{card.orderNumber}</div>
+          <div style={{ fontWeight: 600, fontSize: compactView ? 12 : 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {card.orderNumber}
+            {(attachmentCount > 0 || commentCount > 0) && (
+              <span title={attachmentCount > 0 ? `Attachments (${attachmentCount})` : `Comments (${commentCount})`} style={{ fontSize: 12 }}>📎</span>
+            )}
+          </div>
           {!showArchived && (
             <button
               data-delete="true"
@@ -1172,9 +1178,10 @@ export default function App() {
             ))}
           </div>
         )}
-        {!compactView && attachmentCount > 0 && (
-          <div style={{ marginTop: 6, fontSize: 12, color: '#6b6b7a', display: 'flex', alignItems: 'center', gap: 4 }}>
-            📎 {attachmentCount}
+        {!compactView && (attachmentCount > 0 || commentCount > 0) && (
+          <div style={{ marginTop: 6, fontSize: 12, color: '#6b6b7a', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {attachmentCount > 0 && (<span>📎 {attachmentCount}</span>)}
+            {commentCount > 0 && (<span>💬 {commentCount}</span>)}
           </div>
         )}
       </div>
