@@ -7,14 +7,14 @@ type TagMap = Record<string, string>; // tag -> designer name (column title)
 
 // Default mapping if env is not provided
 const DEFAULT_TAG_MAP: TagMap = {
-  gorkem: 'Gorkem',
-  reyhan: 'Reyhan',
-  gulcehre: 'Gulcehre',
-  ebrar: 'Ebrar',
   yavuz: 'Yavuz',
   sude: 'Sude',
-  sabiha: 'Sabiha',
+  gorkem: 'Gorkem',
+  ebrar: 'Ebrar',
   busra: 'Busra',
+  sabiha: 'Sabiha',
+  gulcehre: 'Gulcehre',
+  reyhan: 'Reyhan',
 };
 
 function parseTagMap(): TagMap {
@@ -23,9 +23,13 @@ function parseTagMap(): TagMap {
   try {
     const obj = JSON.parse(raw);
     if (Array.isArray(obj)) {
-      return Object.fromEntries(obj.map((x: any) => [String(x.tag || x.key), String(x.designer || x.value)]));
+      return Object.fromEntries(
+        obj.map((x: any) => [String(x.tag || x.key).toLowerCase().trim(), String(x.designer || x.value)])
+      );
     }
-    return Object.fromEntries(Object.entries(obj).map(([k, v]) => [String(k), String(v as any)]));
+    return Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [String(k).toLowerCase().trim(), String(v as any)])
+    );
   } catch {
     return { ...DEFAULT_TAG_MAP };
   }
@@ -93,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const tagToDesigner = (tags: string[]): string | null => {
       for (const t of tags) {
-        const key = t.trim();
+        const key = t.trim().toLowerCase();
         if (tagMap[key]) return tagMap[key];
       }
       return null;

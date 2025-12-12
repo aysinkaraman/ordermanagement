@@ -327,15 +327,20 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initial load
+  // Load columns for the current board (and mode)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
-        let url = '/api/columns';
+        // Require a selected board to avoid mixing data
+        if (!currentBoardId) {
+          setColumns([]);
+          return;
+        }
+        let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
         if (showArchived) {
-          url = `/api/columns?archived=true&mode=${archiveMode}`;
+          url = `/api/columns?archived=true&mode=${archiveMode}&boardId=${encodeURIComponent(currentBoardId)}`;
         }
         const res = await fetch(url);
         const data = await res.json();
@@ -350,7 +355,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [showArchived, archiveMode]);
+  }, [showArchived, archiveMode, currentBoardId]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -682,12 +687,7 @@ export default function App() {
       const res = await fetch('/api/boards');
       const data = await res.json();
       setBoards(data || []);
-      if (data && data.length > 0 && !currentBoardId) {
-        setCurrentBoardId(data[0].id);
-        setBoardTitle(data[0].title || 'Falcon Board');
-        setCompanyLogo(localStorage.getItem('companyLogo'));
-        loadBoardMembers(data[0].id);
-      }
+      // Do not auto-select first board here; `lastBoardId` loader handles selection.
     } catch (e) {
       console.error('Failed to load boards', e);
     }
@@ -3056,6 +3056,11 @@ export default function App() {
               <div
                 key={board.id}
                 onClick={async () => {
+                  // Clear UI state before switching to avoid visual mix
+                  setColumns([]);
+                  setOpenListMenuId(null);
+                  setOpenSortMenuId(null);
+                  setActiveAddColumnId(null);
                   setCurrentBoardId(board.id);
                   setBoardTitle(board.title || 'Falcon Board');
                   setCompanyLogo(board.logo || null);
