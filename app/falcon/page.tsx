@@ -271,7 +271,9 @@ export default function App() {
       try {
         const parsed = JSON.parse(userStr);
         setCurrentUser(parsed);
-        if (parsed?.companyLogo) setCompanyLogo(parsed.companyLogo);
+        if (parsed?.companyLogo) {
+          setCompanyLogo(parsed.companyLogo);
+        }
       } catch (e) {
         console.error('Failed to parse user', e);
       }
@@ -454,13 +456,14 @@ export default function App() {
       }
 
       const newBoard = await response.json();
-      setBoards([...boards, newBoard]);
+      setBoards((prev) => [...prev, newBoard]);
       setNewBoardTitle('');
       alert('✅ Board created successfully!');
       
       // Switch to new board
       setCurrentBoardId(newBoard.id);
       setBoardTitle(newBoard.title);
+      setCompanyLogo(newBoard.logo || null);
       loadBoardMembers(newBoard.id);
       setShowBoardSelector(false);
       window.location.reload();
@@ -641,6 +644,7 @@ export default function App() {
       if (data && data.length > 0 && !currentBoardId) {
         setCurrentBoardId(data[0].id);
         setBoardTitle(data[0].title || 'Falcon Board');
+        setCompanyLogo(data[0].logo || localStorage.getItem('companyLogo'));
         loadBoardMembers(data[0].id);
       }
     } catch (e) {
@@ -1679,19 +1683,23 @@ export default function App() {
       const dataUrl = reader.result as string;
       setCompanyLogo(dataUrl);
       localStorage.setItem('companyLogo', dataUrl);
+      // Persist on Board without schema changes
       try {
-        const resp = await fetch('/api/auth/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ companyLogo: dataUrl }),
-        });
-        if (resp.ok) {
-          const updatedUser = await resp.json();
-          setCurrentUser(updatedUser);
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+        if (currentBoardId) {
+          const resp = await fetch(`/api/boards/${currentBoardId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ logo: dataUrl }),
+          });
+          if (resp.ok) {
+            const updatedBoard = await resp.json();
+            setCompanyLogo(updatedBoard.logo || dataUrl);
+            // update local boards cache
+            setBoards((prev) => prev.map(b => b.id === updatedBoard.id ? updatedBoard : b));
+          }
         }
       } catch (err) {
-        console.error('Failed to persist company logo', err);
+        console.error('Failed to persist board logo', err);
       }
     };
     reader.readAsDataURL(file);
@@ -2998,6 +3006,7 @@ export default function App() {
                 onClick={() => {
                   setCurrentBoardId(board.id);
                   setBoardTitle(board.title || 'Falcon Board');
+                  setCompanyLogo(board.logo || null);
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
                   // Reload board data
