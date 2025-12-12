@@ -1213,14 +1213,18 @@ export default function App() {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Sort list</div>
+            {/* Türkçe: A'dan Z'ye ve Z'den A'ya en üste alındı */}
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-asc'); setOpenSortMenuId(null); }}>
+              Card name (A → Z)
+            </div>
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-desc'); setOpenSortMenuId(null); }}>
+              Card name (Z → A)
+            </div>
             <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'date-newest'); setOpenSortMenuId(null); }}>
               Date created (newest first)
             </div>
             <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'date-oldest'); setOpenSortMenuId(null); }}>
               Date created (oldest first)
-            </div>
-            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-asc'); setOpenSortMenuId(null); }}>
-              Card name (alphabetically)
             </div>
           </div>
         )}
