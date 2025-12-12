@@ -10,6 +10,7 @@ export default function StandupPage() {
   const [columns, setColumns] = useState<Column[]>([]);
   const [importing, setImporting] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [buildInfo, setBuildInfo] = useState<{ sha?: string; ref?: string; env?: string } | null>(null);
 
   const fetchBoard = async () => {
     try {
@@ -62,6 +63,12 @@ export default function StandupPage() {
   };
 
   useEffect(() => { fetchBoard(); }, []);
+  useEffect(() => {
+    fetch('/api/version')
+      .then(r => r.json())
+      .then(data => setBuildInfo({ sha: data.sha, ref: data.ref, env: data.env }))
+      .catch(() => setBuildInfo(null));
+  }, []);
 
   const todayCount = (cards: Card[]) => {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -70,7 +77,22 @@ export default function StandupPage() {
 
   return (
     <div style={{ padding: 16 }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700 }}>Daily Standup</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700 }}>
+        Daily Standup
+        {buildInfo?.sha && (
+          <span style={{
+            marginLeft: 8,
+            fontSize: 11,
+            fontWeight: 600,
+            background: '#e5e7eb',
+            color: '#111827',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}>
+            {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {buildInfo.sha.slice(0,7)}
+          </span>
+        )}
+      </h1>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button disabled={importing} onClick={handleImport} style={{ padding: '8px 12px', background: '#2563eb', color: '#fff', borderRadius: 6 }}>Fetch Tagged Orders</button>
         <button disabled={archiving} onClick={handleArchive} style={{ padding: '8px 12px', background: '#111827', color: '#fff', borderRadius: 6 }}>Archive Previous Days</button>
