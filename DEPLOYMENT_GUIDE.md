@@ -132,6 +132,8 @@ git push
 # Vercel otomatik build + deploy! ✨
 ```
 
+> Deploy bump: Fri Dec 12, 2025 — force redeploy marker
+
 ---
 
 ## ⚡ Performance & Cost
