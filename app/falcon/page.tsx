@@ -2043,42 +2043,6 @@ export default function App() {
           🎨 Theme
         </button>
 
-        <button
-          onClick={async () => {
-            if (!currentBoardId) {
-              alert('Please create a board first');
-              return;
-            }
-            if (!confirm('Import orders from Shopify? This will create cards for new orders.')) return;
-            
-            try {
-              const res = await fetch(`/api/shopify/orders?boardId=${currentBoardId}`, { method: 'POST' });
-              const data = await res.json();
-              
-              if (!res.ok) {
-                throw new Error(data.error || 'Failed to import orders');
-              }
-              
-              alert(`✅ ${data.imported} orders imported successfully!`);
-              window.location.reload();
-            } catch (e: any) {
-              console.error('Shopify import error:', e);
-              alert(`❌ ${e.message || 'Failed to import from Shopify'}`);
-            }
-          }}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 6,
-            border: 'none',
-            background: 'rgba(147, 51, 234, 0.9)',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
         {/* Import Shopify Orders button removed: handled by webhook */}
 
         <button
