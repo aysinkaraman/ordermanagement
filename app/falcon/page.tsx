@@ -706,6 +706,8 @@ export default function App() {
             : c
         )
       );
+      // Count as arrival to this column for today
+      incrementDailyArrivals(columnId);
       setNewCardText('');
       setActiveAddColumnId(null);
     } catch (e) {
@@ -913,6 +915,8 @@ export default function App() {
       };
 
       toCol.cards.push(movedCard);
+      // Count as an arrival to the target column for today
+      incrementDailyArrivals(targetColumnId);
       setActiveCard((prevCard) => (prevCard && String(prevCard.id) === String(cardId) ? movedCard : prevCard));
       return next;
     });
@@ -1217,6 +1221,10 @@ export default function App() {
         {/* Stats Dashboard */}
         {!showArchived && (() => {
           const stats = getColumnStats(col.cards || []);
+          // Read today's arrival counter for this column
+          const todayKey = new Date().toISOString().slice(0, 10);
+          const arrivalsKey = `dailyArrivals:${String(col.id)}:${todayKey}`;
+          const arrivalsToday = parseInt(localStorage.getItem(arrivalsKey) || '0', 10) || 0;
           const completionRate = stats.withDueDate > 0 
             ? ((stats.withDueDate - stats.overdue) / stats.withDueDate) * 100 
             : 100;
@@ -1231,8 +1239,8 @@ export default function App() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ color: '#666', fontWeight: 600 }}>📊 {stats.total} cards</span>
-                {stats.addedToday > 0 && (
-                  <span style={{ color: '#059669', fontWeight: 600 }}>+{stats.addedToday} today</span>
+                {arrivalsToday > 0 && (
+                  <span style={{ color: '#059669', fontWeight: 600 }}>+{arrivalsToday} today</span>
                 )}
               </div>
               
@@ -1728,13 +1736,7 @@ export default function App() {
     const total = cards.length;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const addedToday = cards.filter(card => {
-      if (!card.createdAt) return false;
-      const cardDate = new Date(card.createdAt);
-      cardDate.setHours(0, 0, 0, 0);
-      return cardDate.getTime() === today.getTime();
-    }).length;
+    const addedToday = 0; // placeholder; computed per column where rendered
     
     const overdue = cards.filter(card => {
       if (!card.dueDate) return false;
@@ -1744,6 +1746,14 @@ export default function App() {
     const withDueDate = cards.filter(card => card.dueDate).length;
     
     return { total, addedToday, overdue, withDueDate };
+  };
+
+  // Increment today's arrival counter for a specific column (creation or move-in)
+  const incrementDailyArrivals = (columnId: string | number) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `dailyArrivals:${String(columnId)}:${today}`;
+    const current = parseInt(localStorage.getItem(key) || '0', 10) || 0;
+    localStorage.setItem(key, String(current + 1));
   };
 
   const header = (
