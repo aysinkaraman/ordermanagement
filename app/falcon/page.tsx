@@ -3015,14 +3015,13 @@ export default function App() {
             {boards.map((board) => (
               <div
                 key={board.id}
-                onClick={() => {
+                onClick={async () => {
                   setCurrentBoardId(board.id);
                   setBoardTitle(board.title || 'Falcon Board');
                   setCompanyLogo(board.logo || null);
+                  await loadBoardById(board.id);
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
-                  // Reload board data
-                  window.location.reload();
                 }}
                 style={{
                   padding: 16,
