@@ -1282,7 +1282,7 @@ export default function App() {
             borderRadius: 8,
             padding: 8,
             minHeight: 60,
-            maxHeight: 500,
+            maxHeight: '70dvh',
             overflowY: 'auto',
           }}
         >
@@ -2873,7 +2873,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: darkMode ? '#0b0f14' : '#f6f6f7' }}>
+    <div style={{ minHeight: '100dvh', background: darkMode ? '#0b0f14' : '#f6f6f7', display: 'flex', flexDirection: 'column' }}>
       {header}
       {loading ? (
         <div style={{ padding: 24 }}>Loading...</div>
@@ -2893,8 +2893,8 @@ export default function App() {
               )}
             </div>
           )}
-          <div style={{ padding: 16, overflowX: 'auto' }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ padding: 16, overflowX: 'auto', flex: 1 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', height: '100%' }}>
               {globalFilteredColumns.map(renderColumn)}
               {!globalSearch && newColumnCard}
             </div>
