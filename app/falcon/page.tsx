@@ -155,7 +155,7 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
-  const [compactView, setCompactView] = useState(true);
+  const [compactView] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string>('');
   const [globalSearch, setGlobalSearch] = useState<string>('');
@@ -1869,7 +1869,7 @@ export default function App() {
           )}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {/* Global Search */}
         <div style={{ position: 'relative' }}>
           <input
@@ -1878,14 +1878,14 @@ export default function App() {
             onChange={(e) => setGlobalSearch(e.target.value)}
             placeholder="🔍 Search cards..."
             style={{
-              padding: '8px 12px 8px 32px',
-              borderRadius: 6,
+              padding: '6px 10px 6px 28px',
+              borderRadius: 5,
               border: 'none',
               background: 'rgba(255,255,255,0.2)',
               color: '#fff',
-              fontSize: 13,
+              fontSize: 12,
               outline: 'none',
-              width: globalSearch ? '250px' : '180px',
+              width: globalSearch ? '220px' : '160px',
               transition: 'width 0.3s ease, background 0.2s',
             }}
             onFocus={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
@@ -1913,26 +1913,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Compact View Toggle */}
-        <button
-          onClick={() => setCompactView(!compactView)}
-          style={{
-            padding: '8px 16px',
-            borderRadius: 6,
-            border: 'none',
-            background: compactView ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
-            color: compactView ? '#92400E' : '#fff',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-          title={compactView ? 'Comfortable View' : 'Compact View'}
-        >
-          {compactView ? '📋 Compact' : '📝 Comfortable'}
-        </button>
+        {/* Compact View enforced: toggle removed */}
 
         {/* Label Filter */}
         {!showArchived && (() => {
@@ -1978,17 +1959,17 @@ export default function App() {
         <button
           onClick={() => setShowTeamModal(!showTeamModal)}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: 'rgba(168, 85, 247, 0.9)',
             color: '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
           title="Manage teams"
         >
@@ -1999,17 +1980,17 @@ export default function App() {
         <button
           onClick={() => setShowBoardSelector(!showBoardSelector)}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: 'rgba(255, 255, 255, 0.2)',
             color: '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
           title="Switch between boards"
         >
@@ -2020,17 +2001,17 @@ export default function App() {
         <button
           onClick={() => setShowShareModal(!showShareModal)}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: 'rgba(59, 130, 246, 0.9)',
             color: '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
           title="Share this board with team members"
         >
@@ -2040,17 +2021,17 @@ export default function App() {
         <button
           onClick={() => setShowThemePicker(!showThemePicker)}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: darkMode ? (showThemePicker ? '#374151' : '#1f2937') : (showThemePicker ? '#FEF3C7' : 'rgba(255,255,255,0.2)'),
             color: '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
           title="Customize Theme"
         >
@@ -2060,17 +2041,17 @@ export default function App() {
         <button
           onClick={() => setDarkMode(!darkMode)}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: darkMode ? '#111827' : 'rgba(255,255,255,0.2)',
             color: '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
           title="Toggle dark mode"
         >
@@ -2086,17 +2067,17 @@ export default function App() {
             setArchiveMode('cards');
           }}
           style={{
-            padding: '8px 16px',
-            borderRadius: 6,
+            padding: '6px 12px',
+            borderRadius: 5,
             border: 'none',
             background: showArchived ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
             color: showArchived ? '#92400E' : '#fff',
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
           }}
         >
           📂 Archived Items
@@ -2104,19 +2085,16 @@ export default function App() {
 
         {/* User Profile & Logout */}
         {currentUser && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 12, paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
-            <div 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
+            <div
               onClick={() => {
                 setProfileName(currentUser.name);
                 setProfileAvatar(currentUser.avatar || '');
                 setShowProfileModal(true);
               }}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 8,
+              style={{
                 cursor: 'pointer',
-                padding: '4px 8px',
+                padding: '2px',
                 borderRadius: 6,
                 transition: 'background 0.2s',
               }}
@@ -2125,8 +2103,8 @@ export default function App() {
               title="Click to edit profile"
             >
               <div style={{
-                width: 36,
-                height: 36,
+                width: 28,
+                height: 28,
                 borderRadius: '50%',
                 background: currentUser.avatar && currentUser.avatar.startsWith('data:')
                   ? '#fff'
@@ -2134,7 +2112,7 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: currentUser.avatar && currentUser.avatar.startsWith('data:') ? 0 : 16,
+                fontSize: currentUser.avatar && currentUser.avatar.startsWith('data:') ? 0 : 13,
                 fontWeight: 'bold',
                 color: '#fff',
                 border: '2px solid rgba(255,255,255,0.5)',
@@ -2147,25 +2125,17 @@ export default function App() {
               }}>
                 {(!currentUser.avatar || !currentUser.avatar.startsWith('data:')) && (currentUser.avatar || currentUser.name.charAt(0).toUpperCase())}
               </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
-                  {currentUser.name}
-                </div>
-                <div style={{ fontSize: 11, opacity: 0.8, color: '#FEF3C7' }}>
-                  {currentUser.email}
-                </div>
-              </div>
             </div>
             <button
               onClick={handleLogout}
               style={{
-                padding: '6px 12px',
-                borderRadius: 6,
+                padding: '4px 10px',
+                borderRadius: 5,
                 border: 'none',
                 background: 'rgba(255,255,255,0.2)',
                 color: '#fff',
                 cursor: 'pointer',
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: 600,
                 transition: 'background 0.2s',
               }}
@@ -2903,7 +2873,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f6f6f7' }}>
+    <div style={{ minHeight: '100vh', background: darkMode ? '#0b0f14' : '#f6f6f7' }}>
       {header}
       {loading ? (
         <div style={{ padding: 24 }}>Loading...</div>
