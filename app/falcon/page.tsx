@@ -1754,7 +1754,7 @@ export default function App() {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            border: '2px dashed rgba(255,255,255,0.4)',
+            border: 'none',
             overflow: 'hidden',
             flexShrink: 0
           }}
