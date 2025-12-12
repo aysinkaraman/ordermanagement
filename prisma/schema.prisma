@@ -13,7 +13,6 @@ model User {
   password        String
   name            String
   avatar          String?
-  companyLogo     String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   activities      Activity[]
@@ -85,7 +84,6 @@ model Board {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   teamId         String?
-  logo           String?
   primaryColor   String        @default("#D97706")
   secondaryColor String        @default("#92400E")
   owner          User          @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
