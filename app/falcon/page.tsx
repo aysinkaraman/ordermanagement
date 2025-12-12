@@ -114,10 +114,6 @@ type Column = {
   cards: Card[];
 };
 
-type ColumnSettings = {
-  color?: string | null;
-  sortDirection?: 'asc' | 'desc';
-};
 
 type User = {
   id: number;
@@ -155,7 +151,7 @@ export default function App() {
   const [draggingColumnId, setDraggingColumnId] = useState<string | number | null>(null);
   const [openListMenuId, setOpenListMenuId] = useState<string | number | null>(null);
   const [openSortMenuId, setOpenSortMenuId] = useState<string | number | null>(null);
-  const [columnSettings, setColumnSettings] = useState<Record<string | number, ColumnSettings>>({});
+  // Remove columnSettings and color picker, use pastel color by index
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveMode, setArchiveMode] = useState<'cards' | 'lists'>('cards');
@@ -241,20 +237,17 @@ export default function App() {
     cards: (apiCol.cards || []).map(mapApiCard),
   });
 
-  const colorPalette = [
-    '#FF6B6B',
-    '#4ECDC4',
-    '#45B7D1',
-    '#FFA07A',
-    '#98D8C8',
-    '#F7DC6F',
-    '#BB8FCE',
-    '#85C1E2',
-    '#F8B88B',
-    '#FFB6D9',
-    '#B4E7CE',
-    '#DDA0DD',
-    '#90EE90',
+  const pastelPalette = [
+    '#FFD6E0', // pink
+    '#D6EFFF', // blue
+    '#FFF9D6', // yellow
+    '#D6FFD6', // green
+    '#E0D6FF', // purple
+    '#FFEFD6', // orange
+    '#D6FFF6', // teal
+    '#FFF6D6', // light yellow
+    '#FFD6F6', // magenta
+    '#D6FFF9', // aqua
   ];
 
   // Load user from localStorage
@@ -989,12 +982,6 @@ export default function App() {
     setOpenListMenuId(null);
   };
 
-  const setColumnColor = (columnId: string | number, color: string | null) => {
-    setColumnSettings((prev) => ({
-      ...prev,
-      [columnId]: { ...(prev[columnId] || {}), color },
-    }));
-  };
 
   // Render helpers
   const renderCard = (card: Card, columnId: string | number) => {
@@ -1090,8 +1077,6 @@ export default function App() {
   };
 
   const renderColumn = (col: Column) => {
-    const settings = columnSettings[col.id] || {};
-    const bg = settings.color || '#f1f2f3';
     const isMenuOpen = openListMenuId === col.id;
     const isAddCardActive = activeAddColumnId === col.id;
 
@@ -1101,7 +1086,7 @@ export default function App() {
         onDragOver={handleColumnDragOver}
         onDrop={(e) => handleColumnDrop(e, col.id)}
         style={{
-          background: bg,
+          background: pastelPalette[(columns.findIndex(c => c.id === col.id)) % pastelPalette.length],
           borderRadius: 10,
           boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
           padding: 10,
@@ -1173,26 +1158,6 @@ export default function App() {
             >
               Sort by...
               <span style={{ fontSize: 10 }}>▶</span>
-            </div>
-            <div style={{ fontSize: 12, color: '#555', margin: '8px 0 4px' }}>Change list color</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
-              {colorPalette.map((c) => (
-                <div
-                  key={c}
-                  onClick={() => setColumnColor(col.id, c)}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 4,
-                    background: c,
-                    cursor: 'pointer',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                  }}
-                />
-              ))}
-            </div>
-            <div style={menuItemStyle} onClick={() => setColumnColor(col.id, null)}>
-              Remove color
             </div>
           </div>
         )}
