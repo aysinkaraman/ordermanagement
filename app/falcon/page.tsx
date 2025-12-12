@@ -1076,15 +1076,15 @@ export default function App() {
   };
 
   // List Actions
-  const sortColumnCards = (columnId: string | number, sortType: 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest') => {
+  const sortColumnCards = async (columnId: string | number, sortType: 'name-asc' | 'name-desc' | 'date-newest' | 'date-oldest') => {
+    let sortedCards: Card[] = [];
     setColumns((prev) =>
       prev.map((col) => {
         if (col.id !== columnId) return col;
-        const sorted = [...(col.cards || [])].sort((a, b) => {
+        sortedCards = [...(col.cards || [])].sort((a, b) => {
           switch (sortType) {
             case 'name-asc':
             case 'name-desc': {
-              // Sort by card name (orderNumber)
               const aNum = parseInt(a.orderNumber, 10);
               const bNum = parseInt(b.orderNumber, 10);
               const aIsNum = !isNaN(aNum);
@@ -1097,8 +1097,6 @@ export default function App() {
             }
             case 'date-newest':
             case 'date-oldest': {
-              // Sort by creation date - note: cards don't have createdAt in Card type yet
-              // For now, sort by order which represents creation order
               return sortType === 'date-newest' 
                 ? (b.id as string).localeCompare(a.id as string)
                 : (a.id as string).localeCompare(b.id as string);
@@ -1107,9 +1105,21 @@ export default function App() {
               return 0;
           }
         });
-        return { ...col, cards: sorted };
+        return { ...col, cards: sortedCards };
       })
     );
+    // Backend'e sırayı kaydet
+    if (sortedCards.length > 0) {
+      await Promise.all(
+        sortedCards.map((card, idx) =>
+          fetch(`/api/cards/${card.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: idx }),
+          })
+        )
+      );
+    }
     setOpenListMenuId(null);
   };
 
