@@ -42,7 +42,19 @@ async function ensureStandupBoard(userId: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request);
+    const isCron = request.headers.get('x-vercel-cron') === '1';
+    let userId = getUserIdFromRequest(request);
+    if (!userId && isCron) {
+      const ownerEmail = process.env.STANDUP_OWNER_EMAIL || '';
+      if (ownerEmail) {
+        const owner = await prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } });
+        if (owner) userId = owner.id;
+      }
+      if (!userId) {
+        const first = await prisma.user.findFirst({ select: { id: true } });
+        if (first) userId = first.id;
+      }
+    }
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!SHOPIFY_CONFIG.shopName || !SHOPIFY_CONFIG.accessToken) {
@@ -124,4 +136,9 @@ export async function POST(request: NextRequest) {
     console.error('Standup import error:', error);
     return NextResponse.json({ error: error.message || 'Failed to import standup items' }, { status: 500 });
   }
+}
+
+// Allow Vercel Cron (GET) to trigger import
+export async function GET(request: NextRequest) {
+  return POST(request);
 }

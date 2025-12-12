@@ -10,8 +10,9 @@ function startOfToday(tzOffsetMinutes = 0) {
 
 export async function POST(request: NextRequest) {
   try {
+    const isCron = request.headers.get('x-vercel-cron') === '1';
     const userId = getUserIdFromRequest(request);
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!userId && !isCron) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Default to Canada Eastern Time (UTC-5) in December: -300 minutes
     const tz = parseInt(process.env.STANDUP_TZ_MINUTES || '-300', 10) || -300;
@@ -44,4 +45,9 @@ export async function POST(request: NextRequest) {
     console.error('Standup archive error:', error);
     return NextResponse.json({ error: error.message || 'Failed to archive standup cards' }, { status: 500 });
   }
+}
+
+// Allow Vercel Cron (GET)
+export async function GET(request: NextRequest) {
+  return POST(request);
 }
