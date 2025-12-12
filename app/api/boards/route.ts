@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
+function makeCuid() {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = 'c';
+  for (let i = 0; i < 24; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
 
 // GET /api/boards - Get all boards user has access to
 export async function GET(request: NextRequest) {
@@ -95,11 +101,16 @@ export async function POST(request: NextRequest) {
       if (err?.code === 'P2022') {
         const _title = title || 'My Kanban Board';
         const _isPublic = !!isPublic;
+        const id = makeCuid();
+        const now = new Date();
         const result = await prisma.$queryRawUnsafe<any[]>(
-          'INSERT INTO "Board" ("title", "isPublic", "ownerId") VALUES ($1, $2, $3) RETURNING "id", "title", "isPublic", "ownerId", "teamId", "createdAt", "updatedAt"',
+          'INSERT INTO "Board" ("id", "title", "isPublic", "ownerId", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id", "title", "isPublic", "ownerId", "teamId", "createdAt", "updatedAt"',
+          id,
           _title,
           _isPublic,
-          userId
+          userId,
+          now,
+          now
         );
         const row = result?.[0];
         if (row) {
