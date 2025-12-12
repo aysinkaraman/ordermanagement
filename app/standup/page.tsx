@@ -80,7 +80,7 @@ export default function StandupPage() {
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>
         Daily Standup
         {buildInfo?.sha && (
-          <span style={{
+          <a href="/api/version" target="_blank" rel="noreferrer" style={{
             marginLeft: 8,
             fontSize: 11,
             fontWeight: 600,
@@ -88,9 +88,11 @@ export default function StandupPage() {
             color: '#111827',
             padding: '2px 6px',
             borderRadius: 4,
+            textDecoration: 'none',
+            display: 'inline-block',
           }}>
-            {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {buildInfo.sha.slice(0,7)}
-          </span>
+            {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {(buildInfo.sha || '').slice(0,7)}
+          </a>
         )}
       </h1>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

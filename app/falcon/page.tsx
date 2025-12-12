@@ -1892,7 +1892,7 @@ export default function App() {
             >
               {boardTitle}
               {buildInfo?.sha && (
-                <span style={{
+                <a href="/api/version" target="_blank" rel="noreferrer" style={{
                   marginLeft: 8,
                   fontSize: 11,
                   fontWeight: 600,
@@ -1900,9 +1900,11 @@ export default function App() {
                   color: '#fff',
                   padding: '2px 6px',
                   borderRadius: 4,
+                  textDecoration: 'none',
+                  display: 'inline-block',
                 }}>
-                  {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {buildInfo.sha.slice(0,7)}
-                </span>
+                  {buildInfo.env || 'env'} · {buildInfo.ref || 'ref'} · {(buildInfo.sha || '').slice(0,7)}
+                </a>
               )}
             </div>
           )}
