@@ -152,9 +152,11 @@ export async function POST(request: NextRequest) {
     if (existingCard) {
       console.log('⚠️ Order already exists:', order.order_number);
       
-      // If card exists but tags have changed (Flow added them later), move to correct column
-      if (existingCard.column.title !== targetColumn) {
-        console.log(`🔄 Tags changed! Moving from ${existingCard.column.title} to ${targetColumn}`);
+      // Check if this card was created recently (within 1 minute) and in wrong column
+      const createdRecently = new Date().getTime() - new Date(existingCard.createdAt).getTime() < 1 * 60 * 1000;
+      
+      if (createdRecently && existingCard.column.title !== targetColumn) {
+        console.log(`🔄 Card created recently in wrong column. Moving from ${existingCard.column.title} to ${targetColumn}`);
         
         await prisma.card.update({
           where: { id: existingCard.id },
@@ -164,18 +166,19 @@ export async function POST(request: NextRequest) {
         await prisma.activity.create({
           data: {
             cardId: existingCard.id,
-            message: `Order moved from ${existingCard.column.title} to ${targetColumn} (tags updated by Shopify Flow)`,
+            message: `Order moved from ${existingCard.column.title} to ${targetColumn} (tags arrived from Shopify Flow)`,
           },
         });
         
         return NextResponse.json({ 
-          message: 'Order updated with new tags', 
+          message: 'Order moved to correct column', 
           cardId: existingCard.id,
           movedFrom: existingCard.column.title,
           movedTo: targetColumn
         });
       }
       
+      console.log('⏭️ Card exists and is older than 5 minutes or already in correct column - ignoring webhook');
       return NextResponse.json({ message: 'Order already exists', cardId: existingCard.id });
     }
 
