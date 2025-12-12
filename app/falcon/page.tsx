@@ -204,10 +204,15 @@ export default function App() {
       const res = await fetch(`/api/boards/${boardId}`);
       const board = await res.json();
       if (!res.ok) throw new Error(board.error || 'Failed to load board');
-      const cols = (board.columns || []).map((c: any) => ({ id: c.id, name: c.title, cards: (c.cards || []).map((card: any) => ({ id: card.id, columnId: c.id, orderNumber: card.title })) }));
+      const cols = (board.columns || []).map((c: any) => ({
+        id: c.id,
+        name: (c.name && String(c.name).trim()) ? c.name : (c.title && String(c.title).trim()) ? c.title : 'List',
+        cards: (c.cards || []).map((card: any) => ({ id: card.id, columnId: c.id, orderNumber: card.title }))
+      }));
       setColumns(cols);
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
+      applyBoardTheme(board.id, board.title || '');
       try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
       console.error('Load board failed', e);
@@ -259,7 +264,11 @@ export default function App() {
 
   const mapApiColumn = (apiCol: any): Column => ({
     id: apiCol.id,
-    name: apiCol.title ?? '',
+    name: (apiCol.name && String(apiCol.name).trim())
+      ? apiCol.name
+      : (apiCol.title && String(apiCol.title).trim())
+        ? apiCol.title
+        : 'List',
     cards: (apiCol.cards || []).map(mapApiCard),
   });
 
@@ -385,7 +394,7 @@ export default function App() {
       const res = await fetch('/api/columns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: name }),
+        body: JSON.stringify({ title: name, boardId: currentBoardId }),
       });
       const created = await res.json();
       const mapped = mapApiColumn(created);
@@ -1763,6 +1772,25 @@ export default function App() {
     localStorage.setItem('secondaryColor', secondary);
   };
 
+  const applyBoardTheme = (boardId: string, title: string) => {
+    try {
+      const raw = localStorage.getItem('boardThemes');
+      const themes = raw ? JSON.parse(raw) : {};
+      const existing = themes?.[boardId];
+      if (existing && existing.primary && existing.secondary) {
+        applyTheme(existing.primary, existing.secondary);
+        return;
+      }
+      const isStandup = /standup/i.test(title);
+      const preset = isStandup
+        ? { primary: '#DB2777', secondary: '#9F1239' }
+        : { primary: '#D97706', secondary: '#92400E' };
+      applyTheme(preset.primary, preset.secondary);
+      const next = { ...themes, [boardId]: preset };
+      localStorage.setItem('boardThemes', JSON.stringify(next));
+    } catch {}
+  };
+
   // Calculate stats for a column
   const getColumnStats = (cards: Card[]) => {
     const total = cards.length;
@@ -3032,6 +3060,7 @@ export default function App() {
                   setBoardTitle(board.title || 'Falcon Board');
                   setCompanyLogo(board.logo || null);
                   await loadBoardById(board.id);
+                  applyBoardTheme(board.id, board.title || '');
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
                   try { localStorage.setItem('lastBoardId', board.id); } catch {}
