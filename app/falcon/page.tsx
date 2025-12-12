@@ -799,15 +799,43 @@ export default function App() {
 
   // Modal control
   const openCardModal = (card: Card) => {
-    setActiveCard(card);
-    setDescriptionDraft(card.customerName || '');
-    setAttachmentNotes(() => {
-      const next: Record<string | number, string> = {};
-      (card.attachments || []).forEach((att) => {
-        next[att.id] = att.note || '';
-      });
-      return next;
-    });
+    (async () => {
+      try {
+        const res = await fetch(`/api/cards/${card.id}`);
+        const fresh = await res.json();
+        const merged: Card = {
+          id: fresh.id,
+          columnId: fresh.columnId,
+          orderNumber: fresh.title ?? card.orderNumber,
+          customerName: fresh.description ?? card.customerName,
+          comments: fresh.comments || [],
+          attachments: (fresh.attachments || []).map(mapApiAttachment),
+          activities: fresh.activities || [],
+          createdAt: fresh.createdAt,
+          dueDate: fresh.dueDate,
+        };
+        setActiveCard(merged);
+        setDescriptionDraft(merged.customerName || '');
+        setAttachmentNotes(() => {
+          const next: Record<string | number, string> = {};
+          (merged.attachments || []).forEach((att) => {
+            next[att.id] = att.note || '';
+          });
+          return next;
+        });
+      } catch {
+        // Fallback to existing card if fetch fails
+        setActiveCard(card);
+        setDescriptionDraft(card.customerName || '');
+        setAttachmentNotes(() => {
+          const next: Record<string | number, string> = {};
+          (card.attachments || []).forEach((att) => {
+            next[att.id] = att.note || '';
+          });
+          return next;
+        });
+      }
+    })();
   };
   const closeCardModal = () => {
     setActiveCard(null);
@@ -835,20 +863,32 @@ export default function App() {
   };
 
   // Comments
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     const text = newComment.trim();
     if (!text || !activeCard) return;
-    const newEntry: Comment = {
-      id: Date.now(),
-      text,
-      author: CURRENT_USER,
-      createdAt: new Date().toISOString(),
-    };
-    updateCardInState(activeCard.id, (card) => ({
-      ...card,
-      comments: [...(card.comments || []), newEntry],
-    }));
-    setNewComment('');
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: activeCard.id, text }),
+      });
+      const created = await res.json();
+      if (!res.ok) throw new Error(created.error || 'Failed to add comment');
+      const newEntry: Comment = {
+        id: created.id,
+        text: created.text,
+        author: CURRENT_USER,
+        createdAt: created.createdAt || new Date().toISOString(),
+      };
+      updateCardInState(activeCard.id, (card) => ({
+        ...card,
+        comments: [...(card.comments || []), newEntry],
+      }));
+      setNewComment('');
+    } catch (e) {
+      console.error('Add comment failed', e);
+      alert('Yorum kaydedilemedi.');
+    }
   };
 
   // Attachments
