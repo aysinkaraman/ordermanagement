@@ -1391,7 +1391,10 @@ export default function App() {
               Date created (oldest first)
             </div>
             <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-asc'); setOpenSortMenuId(null); }}>
-              Card name (alphabetically)
+              Card name (A-Z)
+            </div>
+            <div style={menuItemStyle} onClick={() => { sortColumnCards(col.id, 'name-desc'); setOpenSortMenuId(null); }}>
+              Card name (Z-A)
             </div>
           </div>
         )}
