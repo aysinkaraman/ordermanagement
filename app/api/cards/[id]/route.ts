@@ -13,6 +13,7 @@ export async function GET(
       include: {
         comments: true,
         attachments: true,
+        activities: true,
       },
     });
 
