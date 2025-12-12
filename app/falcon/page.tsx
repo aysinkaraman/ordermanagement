@@ -827,7 +827,26 @@ export default function App() {
   };
 
   // Modal control
-  const openCardModal = (card: Card) => {
+  const openCardModal = async (card: Card) => {
+    try {
+      const res = await fetch(`/api/cards/${card.id}`);
+      if (res.ok) {
+        const apiCard = await res.json();
+        setActiveCard(mapApiCard(apiCard));
+        setDescriptionDraft(apiCard.description || '');
+        setAttachmentNotes(() => {
+          const next: Record<string | number, string> = {};
+          (apiCard.attachments || []).forEach((att: any) => {
+            next[att.id] = att.note || '';
+          });
+          return next;
+        });
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to fetch card details', e);
+    }
+    // fallback to local card if API fails
     setActiveCard(card);
     setDescriptionDraft(card.customerName || '');
     setAttachmentNotes(() => {
