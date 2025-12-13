@@ -125,7 +125,7 @@ type User = {
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [newColumnName, setNewColumnName] = useState('');
   const [columnSaving, setColumnSaving] = useState(false);

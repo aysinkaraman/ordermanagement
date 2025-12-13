@@ -30,6 +30,8 @@ export const CardModal: React.FC<CardModalProps> = ({
   const [newComment, setNewComment] = useState('');
   const [_loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [moveColumns, setMoveColumns] = useState<Array<{ id: string; title: string }>>([]);
+  const [moveTargetColumnId, setMoveTargetColumnId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,13 +39,28 @@ export const CardModal: React.FC<CardModalProps> = ({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [commentsRes, activitiesRes] = await Promise.all([
+        const [cardRes, activitiesRes] = await Promise.all([
           axios.get(`/api/cards/${card.id}`),
           axios.get(`/api/activities/${card.id}`),
         ]);
-        setComments(commentsRes.data.comments || []);
+        const cardData = cardRes.data;
+        setComments(cardData.comments || []);
         setActivities(activitiesRes.data || []);
-        setAttachments(commentsRes.data.attachments || []);
+        setAttachments(cardData.attachments || []);
+
+        // Load columns of the same board for Move UI
+        const boardId = cardData?.column?.boardId;
+        if (boardId) {
+          const colsRes = await axios.get(`/api/columns?boardId=${encodeURIComponent(boardId)}`);
+          const cols = (colsRes.data || [])
+            .filter((c: any) => !c.isArchived)
+            .map((c: any) => ({ id: String(c.id), title: String(c.title || c.name || 'List') }));
+          setMoveColumns(cols);
+          setMoveTargetColumnId(String(cardData.columnId));
+        } else {
+          setMoveColumns([]);
+          setMoveTargetColumnId('');
+        }
       } catch (error) {
         console.error('Error fetching card details:', error);
       } finally {
@@ -68,6 +85,21 @@ export const CardModal: React.FC<CardModalProps> = ({
     } catch (error) {
       toast.error('Failed to add comment');
       console.error(error);
+    }
+  };
+
+  const handleMove = async () => {
+    try {
+      if (!moveTargetColumnId || String(moveTargetColumnId) === String(card.columnId)) return;
+      await axios.patch(`/api/cards/${card.id}`, { columnId: moveTargetColumnId });
+      toast.success('Card moved');
+      // Optimistically update local state
+      // Update activities by refetching minimal activity list
+      const activitiesRes = await axios.get(`/api/activities/${card.id}`);
+      setActivities(activitiesRes.data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to move card');
     }
   };
 
@@ -438,6 +470,28 @@ export const CardModal: React.FC<CardModalProps> = ({
           {/* Activity Log Section */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Activity</h3>
+            {/* Simple Move UI */}
+            {moveColumns.length > 0 && (
+              <div className="mb-4 flex items-center gap-2">
+                <label className="text-sm text-gray-700">Move to</label>
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={moveTargetColumnId}
+                  onChange={(e) => setMoveTargetColumnId(e.target.value)}
+                >
+                  {moveColumns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+                <button
+                  className="ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                  onClick={handleMove}
+                  disabled={!moveTargetColumnId || String(moveTargetColumnId) === String(card.columnId)}
+                >
+                  Move
+                </button>
+              </div>
+            )}
             <div className="space-y-2">
               {activities.length === 0 ? (
                 <p className="text-gray-500 text-sm">No activity yet</p>

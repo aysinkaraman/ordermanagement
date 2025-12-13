@@ -17,6 +17,7 @@ export async function GET(
           orderBy: { createdAt: 'desc' },
           include: { user: { select: { id: true, name: true, avatar: true } } },
         },
+        column: { select: { id: true, boardId: true, title: true } },
       },
     });
 
