@@ -84,10 +84,27 @@ export async function PATCH(
 
     // Log activity for column move
     if (columnId !== undefined && columnId !== card.columnId) {
+      // Fetch destination and source column names for a clearer message
+      const [toColumn, fromColumn] = await Promise.all([
+        prisma.column.findUnique({
+          where: { id: columnId },
+          select: { title: true },
+        }),
+        card.columnId
+          ? prisma.column.findUnique({
+              where: { id: card.columnId },
+              select: { title: true },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      const toName = (toColumn?.title || 'Unknown').toString();
+      const fromName = (fromColumn?.title || 'Unknown').toString();
+
       await prisma.activity.create({
         data: {
           cardId: params.id,
-          message: `Card moved to a different column`,
+          message: `Card moved from "${fromName}" to "${toName}"`,
           userId,
         },
       });
