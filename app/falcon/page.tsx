@@ -135,6 +135,7 @@ export default function App() {
   const [cardSaving, setCardSaving] = useState(false);
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [modalMoveTargetId, setModalMoveTargetId] = useState<string | number | null>(null);
   const [newComment, setNewComment] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [descriptionSaving, setDescriptionSaving] = useState(false);
@@ -816,6 +817,7 @@ export default function App() {
           dueDate: fresh.dueDate,
         };
         setActiveCard(merged);
+        setModalMoveTargetId(merged.columnId);
         setDescriptionDraft(merged.customerName || '');
         setAttachmentNotes(() => {
           const next: Record<string | number, string> = {};
@@ -827,6 +829,7 @@ export default function App() {
       } catch {
         // Fallback to existing card if fetch fails
         setActiveCard(card);
+        setModalMoveTargetId(card.columnId);
         setDescriptionDraft(card.customerName || '');
         setAttachmentNotes(() => {
           const next: Record<string | number, string> = {};
@@ -840,6 +843,7 @@ export default function App() {
   };
   const closeCardModal = () => {
     setActiveCard(null);
+    setModalMoveTargetId(null);
     setDescriptionDraft('');
     setAttachmentNotes({});
   };
@@ -1015,6 +1019,51 @@ export default function App() {
     } finally {
       setDragging(false);
       dragDataRef.current = { cardId: null, fromColumnId: null };
+    }
+  };
+
+  const handleModalMove = async () => {
+    if (!activeCard || !modalMoveTargetId || String(activeCard.columnId) === String(modalMoveTargetId)) return;
+
+    const fromColumnId = activeCard.columnId;
+    const targetColumnId = modalMoveTargetId;
+
+    setColumns((prev) => {
+      const next = prev.map((col) => ({ ...col, cards: [...(col.cards || [])] }));
+      const fromCol = next.find((c) => String(c.id) === String(fromColumnId));
+      const toCol = next.find((c) => String(c.id) === String(targetColumnId));
+      if (!fromCol || !toCol) return prev;
+
+      const idx = fromCol.cards.findIndex((c) => String(c.id) === String(activeCard.id));
+      if (idx === -1) return prev;
+      const card = fromCol.cards[idx];
+
+      fromCol.cards.splice(idx, 1);
+
+      const activity: Activity = {
+        id: Date.now(),
+        message: `Card moved from "${fromCol.name}" to "${toCol.name}"`,
+        createdAt: new Date().toISOString(),
+        user: currentUser ? { id: currentUser.id, name: currentUser.name, avatar: currentUser.avatar || null } : null,
+      };
+
+      const movedCard: Card = { ...card, columnId: toCol.id, activities: [...(card.activities || []), activity] };
+
+      toCol.cards.push(movedCard);
+      incrementDailyArrivals(toCol.id);
+      setActiveCard((prevCard) => (prevCard && String(prevCard.id) === String(activeCard.id) ? movedCard : prevCard));
+      return next;
+    });
+
+    try {
+      await fetch(`/api/cards/${activeCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId: targetColumnId }),
+      });
+    } catch (e) {
+      console.error('Move card (modal) failed', e);
+      alert('Kart taşınamadı (sunucu hatası).');
     }
   };
 
@@ -1498,7 +1547,27 @@ export default function App() {
               <div style={{ fontSize: 22, fontWeight: 700 }}>
                 {activeCard.orderNumber || 'Card'}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {/* Move within current board */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: '#6b6b7a' }}>Move to</span>
+                  <select
+                    value={String(modalMoveTargetId || '')}
+                    onChange={(e) => setModalMoveTargetId(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid #d9d9e3' }}
+                  >
+                    {columns.map((c) => (
+                      <option key={String(c.id)} value={String(c.id)}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleModalMove}
+                    disabled={!modalMoveTargetId || String(modalMoveTargetId) === String(activeCard.columnId)}
+                    style={{ ...primaryBtnStyle, padding: '6px 10px', fontSize: 12 }}
+                  >
+                    Move
+                  </button>
+                </div>
                 {!showArchived && (
                   <button
                     style={{ ...iconBtnStyle, fontSize: 16 }}
