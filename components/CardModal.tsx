@@ -457,14 +457,14 @@ export const CardModal: React.FC<CardModalProps> = ({
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-500 text-base font-bold border">
-                            {user && user.name ? user.name.charAt(0).toUpperCase() : '?'}
+                            {user && user.name ? user.name.charAt(0).toUpperCase() : 'S'}
                           </div>
                         )}
                       </div>
                       {/* User name and message */}
                       <div className="flex-1 min-w-0">
                         <span className="font-semibold text-gray-800">
-                          {user && user.name ? user.name : 'Unknown User'}
+                          {user && user.name ? user.name : 'System'}
                         </span>
                         <span className="ml-1 text-gray-600">{activity.message}</span>
                       </div>

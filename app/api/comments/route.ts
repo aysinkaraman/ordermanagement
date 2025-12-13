@@ -6,8 +6,8 @@ import { getUserIdFromRequest } from '@/lib/auth';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cardId, text } = body;
-    const userId = getUserIdFromRequest(request);
+    const { cardId, text, userId: userIdFromBody } = body;
+    const userId = userIdFromBody || getUserIdFromRequest(request);
 
     const comment = await prisma.comment.create({
       data: {

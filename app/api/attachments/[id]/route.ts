@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
+    const userId = getUserIdFromRequest(request);
 
     const attachment = await prisma.attachment.findUnique({
       where: { id },
@@ -28,6 +30,7 @@ export async function DELETE(
       data: {
         cardId: attachment.cardId,
         message: `Removed attachment: ${attachment.filename}`,
+        ...(userId ? { userId } : {}),
       },
     });
 

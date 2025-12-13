@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdFromRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cardId, filename, url, size, mimeType, note } = body;
+    const { cardId, filename, url, size, mimeType, note, userId: userIdFromBody } = body;
+    const userId = userIdFromBody || getUserIdFromRequest(request);
 
     if (!cardId || !filename || !url) {
       return NextResponse.json(
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
       data: {
         cardId,
         message: `Added attachment: ${filename}`,
+        ...(userId ? { userId } : {}),
       },
     });
 
