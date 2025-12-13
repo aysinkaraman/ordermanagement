@@ -49,7 +49,21 @@ export const CardModal: React.FC<CardModalProps> = ({
         setAttachments(cardData.attachments || []);
 
         // Load columns of the same board for Move UI
-        const boardId = cardData?.column?.boardId;
+        let boardId: string | undefined = cardData?.column?.boardId;
+        // Fallback: resolve boardId via current columnId prop
+        if (!boardId && _columnId) {
+          try {
+            const colRes = await axios.get(`/api/columns/${encodeURIComponent(_columnId)}`);
+            boardId = String(colRes.data?.boardId || '');
+          } catch {}
+        }
+        // Fallback: use currentBoardId from localStorage
+        if (!boardId) {
+          try {
+            const lsBoardId = localStorage.getItem('lastBoardId') || localStorage.getItem('currentBoardId');
+            if (lsBoardId) boardId = String(lsBoardId);
+          } catch {}
+        }
         if (boardId) {
           const colsRes = await axios.get(`/api/columns?boardId=${encodeURIComponent(boardId)}`);
           const cols = (colsRes.data || [])
