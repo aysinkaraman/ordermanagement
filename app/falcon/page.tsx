@@ -336,6 +336,7 @@ export default function App() {
         // Require a selected board to avoid mixing data
         if (!currentBoardId) {
           setColumns([]);
+          if (mounted) setLoading(false);
           return;
         }
         let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
