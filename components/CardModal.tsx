@@ -260,6 +260,28 @@ export const CardModal: React.FC<CardModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
             />
+            {/* Move Control (placed near the top for visibility) */}
+            {moveColumns.length > 0 && (
+              <div className="mt-4 flex items-center gap-2">
+                <label className="text-sm text-gray-700">Move to</label>
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={moveTargetColumnId}
+                  onChange={(e) => setMoveTargetColumnId(e.target.value)}
+                >
+                  {moveColumns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+                <button
+                  className="ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm"
+                  onClick={handleMove}
+                  disabled={!moveTargetColumnId || String(moveTargetColumnId) === String(card.columnId)}
+                >
+                  Move
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Description Section */}
@@ -484,28 +506,6 @@ export const CardModal: React.FC<CardModalProps> = ({
           {/* Activity Log Section */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Activity</h3>
-            {/* Simple Move UI */}
-            {moveColumns.length > 0 && (
-              <div className="mb-4 flex items-center gap-2">
-                <label className="text-sm text-gray-700">Move to</label>
-                <select
-                  className="border rounded px-2 py-1 text-sm"
-                  value={moveTargetColumnId}
-                  onChange={(e) => setMoveTargetColumnId(e.target.value)}
-                >
-                  {moveColumns.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-                <button
-                  className="ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm"
-                  onClick={handleMove}
-                  disabled={!moveTargetColumnId || String(moveTargetColumnId) === String(card.columnId)}
-                >
-                  Move
-                </button>
-              </div>
-            )}
             <div className="space-y-2">
               {activities.length === 0 ? (
                 <p className="text-gray-500 text-sm">No activity yet</p>
