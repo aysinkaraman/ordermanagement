@@ -1754,7 +1754,7 @@ export default function App() {
               <input
                 type="file"
                 style={{ display: 'none' }}
-                accept="image/*,application/pdf"
+                accept=".pdf,.png,.svg,.ai,.eps"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleAddAttachment(file);
