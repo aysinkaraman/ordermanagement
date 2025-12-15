@@ -18,6 +18,7 @@ export const CardModal: React.FC<CardModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const MAX_ATTACHMENT_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB client-side guard
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description || '');
   const [dueDate, setDueDate] = useState<string>(card.dueDate ? new Date(card.dueDate).toISOString().slice(0, 16) : '');
@@ -173,8 +174,16 @@ export const CardModal: React.FC<CardModalProps> = ({
 
     setUploading(true);
     try {
+      const fileArr = Array.from(files);
+      const tooBig = fileArr.filter((f) => f.size > MAX_ATTACHMENT_SIZE_BYTES);
+      const okFiles = fileArr.filter((f) => f.size <= MAX_ATTACHMENT_SIZE_BYTES);
+
+      if (tooBig.length > 0) {
+        toast.error(`Bazı dosyalar çok büyük (maksimum 3 MB): ${tooBig.map(f => f.name).join(', ')}`);
+      }
+
       const uploaded = await Promise.all(
-        Array.from(files).map(async (file) => {
+        okFiles.map(async (file) => {
           const dataUrl = await fileToDataUrl(file);
 
           const response = await axios.post('/api/attachments', {
@@ -189,11 +198,17 @@ export const CardModal: React.FC<CardModalProps> = ({
         })
       );
 
-      setAttachments((prev) => [...prev, ...uploaded]);
-      toast.success('Attachment(s) added!');
-    } catch (error) {
-      toast.error('Failed to upload attachment');
-      console.error(error);
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success('Dosya(lar) eklendi!');
+      }
+    } catch (error: any) {
+      if (error?.response?.status === 413) {
+        toast.error('Dosya çok büyük (maksimum 3 MB). Daha küçük bir dosya deneyin.');
+      } else {
+        toast.error('Dosya yüklenemedi');
+      }
+      console.error('Attachment upload error', error);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -406,6 +421,7 @@ export const CardModal: React.FC<CardModalProps> = ({
                 type="file"
                 onChange={handleFileSelect}
                 multiple
+                accept="image/*,application/pdf"
                 className="hidden"
                 id="file-upload"
               />
@@ -417,6 +433,7 @@ export const CardModal: React.FC<CardModalProps> = ({
               >
                 {uploading ? 'Uploading...' : '📎 Add Attachment'}
               </label>
+              <p className="text-xs text-gray-500 mt-2">Maksimum dosya boyutu: 3 MB (resim veya PDF önerilir)</p>
             </div>
 
             {/* Attachments List */}

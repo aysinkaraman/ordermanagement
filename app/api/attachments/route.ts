@@ -15,6 +15,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Server-side safety guard for payload size (3 MB max)
+    const MAX_BYTES = 3 * 1024 * 1024;
+    const declaredSize = Number(size || 0);
+    if (declaredSize > MAX_BYTES) {
+      return NextResponse.json(
+        { error: 'File too large (max 3 MB)' },
+        { status: 413 }
+      );
+    }
+    // If data URL, approximate base64 content length
+    try {
+      const commaIdx = typeof url === 'string' ? url.indexOf(',') : -1;
+      if (commaIdx !== -1) {
+        const b64 = url.slice(commaIdx + 1);
+        // Base64 expands ~4/3. Check decoded length estimation
+        const estimatedBytes = Math.floor((b64.length * 3) / 4);
+        if (estimatedBytes > MAX_BYTES) {
+          return NextResponse.json(
+            { error: 'File too large (max 3 MB)' },
+            { status: 413 }
+          );
+        }
+      }
+    } catch {}
+
     const attachment = await prisma.attachment.create({
       data: {
         cardId,

@@ -897,8 +897,14 @@ export default function App() {
   };
 
   // Attachments
+  const MAX_ATTACHMENT_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB guard to avoid server limits
   const handleAddAttachment = (file: File) => {
     if (!file || !activeCard) return;
+
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      alert('Dosya çok büyük (maksimum 3 MB). Lütfen daha küçük bir dosya yükleyin.');
+      return;
+    }
 
     const toDataUrl = (f: File) =>
       new Promise<string>((resolve, reject) => {
@@ -923,7 +929,13 @@ export default function App() {
             note: '',
           }),
         });
-        if (!res.ok) throw new Error('Upload failed');
+        if (!res.ok) {
+          if (res.status === 413) {
+            alert('Dosya çok büyük (maksimum 3 MB). Lütfen daha küçük bir dosya yükleyin.');
+            return;
+          }
+          throw new Error('Upload failed');
+        }
         const created = await res.json();
         const att = mapApiAttachment(created);
         updateCardInState(activeCard.id, (card) => ({
@@ -1636,12 +1648,14 @@ export default function App() {
               <input
                 type="file"
                 style={{ display: 'none' }}
+                accept="image/*,application/pdf"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleAddAttachment(file);
                 }}
               />
             </label>
+            <div style={{ fontSize: 12, color: '#6b6b7a', marginTop: 6 }}>Maksimum dosya boyutu: 3 MB (resim veya PDF önerilir)</div>
 
             {attachments.length === 0 ? (
               <div style={{ color: '#888', fontSize: 13 }}>No files yet.</div>
