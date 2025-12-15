@@ -189,6 +189,7 @@ export default function App() {
   const [showBoardSelector, setShowBoardSelector] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const [creatingBoard, setCreatingBoard] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now());
   
   // Teams
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -331,13 +332,18 @@ export default function App() {
   // Load columns for the current board (and mode)
   useEffect(() => {
     let mounted = true;
+    let showTimer: any;
     (async () => {
       try {
-        setLoading(true);
+        // Delay showing the spinner to avoid flicker on fast loads
+        showTimer = setTimeout(() => setLoading(true), 250);
         // Require a selected board to avoid mixing data
         if (!currentBoardId) {
           setColumns([]);
-          if (mounted) setLoading(false);
+          if (mounted) {
+            clearTimeout(showTimer);
+            setLoading(false);
+          }
           return;
         }
         let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
@@ -346,18 +352,62 @@ export default function App() {
         }
         const res = await fetch(url);
         const data = await res.json();
-        if (mounted) setColumns((data || []).map(mapApiColumn));
+        if (mounted) {
+          setColumns((data || []).map(mapApiColumn));
+          setLastUpdatedAt(Date.now());
+        }
       } catch (e) {
         console.error('Failed to load columns', e);
         if (mounted) setColumns([]);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          clearTimeout(showTimer);
+          setLoading(false);
+        }
       }
     })();
     return () => {
       mounted = false;
+      clearTimeout(showTimer);
     };
   }, [showArchived, archiveMode, currentBoardId]);
+
+  // Silent refresh helper (no spinner)
+  const refreshColumns = async () => {
+    if (!currentBoardId) return;
+    try {
+      let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
+      if (showArchived) {
+        url = `/api/columns?archived=true&mode=${archiveMode}&boardId=${encodeURIComponent(currentBoardId)}`;
+      }
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      setColumns((data || []).map(mapApiColumn));
+      setLastUpdatedAt(Date.now());
+    } catch (e) {
+      // Silent fail
+    }
+  };
+
+  // Poll for updates every 15s to reflect order changes without reload
+  useEffect(() => {
+    if (!currentBoardId) return;
+    const id = setInterval(() => {
+      refreshColumns();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [currentBoardId, showArchived, archiveMode]);
+
+  // Refresh when tab becomes visible again
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') {
+        refreshColumns();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [currentBoardId, showArchived, archiveMode]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -2125,6 +2175,11 @@ export default function App() {
               ×
             </button>
           )}
+        </div>
+
+        {/* Last updated indicator */}
+        <div style={{ fontSize: 11, color: '#f3f4f6', opacity: 0.85 }} title={`Last update: ${new Date(lastUpdatedAt).toLocaleString()}`}>
+          Updated: {new Date(lastUpdatedAt).toLocaleTimeString()}
         </div>
 
         {/* Compact View enforced: toggle removed */}
