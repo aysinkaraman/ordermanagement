@@ -1076,6 +1076,28 @@ export default function App() {
     }
   };
 
+  const handleDeleteAttachment = async (attId: string | number) => {
+    if (!activeCard) return;
+    if (!confirm('Bu eki silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`/api/attachments/${attId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+    } catch (e) {
+      console.error('Attachment delete failed', e);
+      alert('Dosya silinemedi.');
+      return;
+    }
+    updateCardInState(activeCard.id, (card) => ({
+      ...card,
+      attachments: (card.attachments || []).filter((a) => String(a.id) !== String(attId)),
+    }));
+    setAttachmentNotes((prev) => {
+      const next = { ...prev };
+      delete next[attId];
+      return next;
+    });
+  };
+
   // Card Drag & Drop
   const handleCardDragStart = (cardId: string | number, fromColumnId: string | number) => {
     setDragging(true);
@@ -1659,6 +1681,8 @@ export default function App() {
             width: '90%',
             maxWidth: 1100,
             minHeight: 500,
+            maxHeight: '85vh',
+            overflowY: 'auto',
             padding: 20,
             display: 'grid',
             gridTemplateColumns: '1.1fr 0.9fr',
@@ -1754,7 +1778,7 @@ export default function App() {
               <input
                 type="file"
                 style={{ display: 'none' }}
-                accept=".pdf,.png,.svg,.ai,.eps"
+                accept=".pdf,.png,.svg,.ai,.eps,.zip,.jpg,.jpeg"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleAddAttachment(file);
@@ -1813,6 +1837,14 @@ export default function App() {
                         >
                           Open / Download
                         </a>
+                        <button
+                          data-delete="true"
+                          onClick={() => handleDeleteAttachment(att.id)}
+                          style={{ ...secondaryBtnStyle, padding: '6px 10px', fontSize: 12, borderColor: '#ef4444', color: '#ef4444' }}
+                          title="Delete attachment"
+                        >
+                          Delete
+                        </button>
                       </div>
 
                       {isImage && (
