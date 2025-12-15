@@ -210,7 +210,17 @@ export default function App() {
       setColumns(cols);
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
-      if (board.logo) setCompanyLogo(board.logo);
+      if (board.logo) {
+        setCompanyLogo(board.logo);
+      } else {
+        // Fallback: use locally stored logo per-board if server has none
+        try {
+          const raw = localStorage.getItem('boardLogos');
+          const logos = raw ? JSON.parse(raw) : {};
+          const localLogo = logos?.[boardId];
+          if (localLogo) setCompanyLogo(localLogo);
+        } catch {}
+      }
       applyBoardTheme(board.id, board.title || '');
       try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
@@ -2011,14 +2021,36 @@ export default function App() {
       // Persist per-board logo if a board is selected
       try {
         if (currentBoardId) {
-          await fetch(`/api/boards/${currentBoardId}`, {
+          const resp = await fetch(`/api/boards/${currentBoardId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ logo: dataUrl }),
           });
+          if (!resp.ok) {
+            // If server persistence fails (e.g., permission), keep in localStorage per board
+            const raw = localStorage.getItem('boardLogos');
+            const logos = raw ? JSON.parse(raw) : {};
+            const next = { ...logos, [currentBoardId]: dataUrl };
+            localStorage.setItem('boardLogos', JSON.stringify(next));
+          } else {
+            // On success, also mirror to local for resilience
+            const raw = localStorage.getItem('boardLogos');
+            const logos = raw ? JSON.parse(raw) : {};
+            const next = { ...logos, [currentBoardId]: dataUrl };
+            localStorage.setItem('boardLogos', JSON.stringify(next));
+          }
         }
       } catch (err) {
         console.warn('Failed to persist logo to board', err);
+        // Network error: store locally as fallback
+        if (currentBoardId) {
+          try {
+            const raw = localStorage.getItem('boardLogos');
+            const logos = raw ? JSON.parse(raw) : {};
+            const next = { ...logos, [currentBoardId]: dataUrl };
+            localStorage.setItem('boardLogos', JSON.stringify(next));
+          } catch {}
+        }
       }
     };
     reader.readAsDataURL(file);
