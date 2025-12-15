@@ -911,22 +911,28 @@ export default function App() {
     (async () => {
       try {
         const dataUrl = await toDataUrl(file);
-        const attachment: Attachment = {
-          id: Date.now(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          url: dataUrl,
-          note: '',
-          createdAt: new Date().toISOString(),
-        };
+        const res = await fetch('/api/attachments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cardId: activeCard.id,
+            filename: file.name,
+            url: dataUrl,
+            size: file.size,
+            mimeType: file.type,
+            note: '',
+          }),
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const created = await res.json();
+        const att = mapApiAttachment(created);
         updateCardInState(activeCard.id, (card) => ({
           ...card,
-          attachments: [...(card.attachments || []), attachment],
+          attachments: [...(card.attachments || []), att],
         }));
-        setAttachmentNotes((prev) => ({ ...prev, [attachment.id]: '' }));
+        setAttachmentNotes((prev) => ({ ...prev, [att.id]: att.note || '' }));
       } catch (err) {
-        console.error('Attachment read failed', err);
+        console.error('Attachment upload failed', err);
         alert('Dosya eklenemedi.');
       }
     })();
