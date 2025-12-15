@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -54,6 +55,26 @@ export default function LoginPage() {
     });
   };
 
+  // Try to show company logo or user's avatar if available
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const parsed = JSON.parse(userStr);
+        if (parsed?.avatar) {
+          setLogoUrl(parsed.avatar);
+          return;
+        }
+        if (parsed?.companyLogo) {
+          setLogoUrl(parsed.companyLogo);
+          return;
+        }
+      }
+      const savedLogo = localStorage.getItem('companyLogo');
+      if (savedLogo) setLogoUrl(savedLogo);
+    } catch {}
+  }, []);
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -73,11 +94,23 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{
-            fontSize: '48px',
-            marginBottom: '10px',
-          }}>
-            🦅
+          <div style={{ marginBottom: '10px' }}>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'inline-block' }} />
+            ) : (
+              <div style={{
+                width: 72,
+                height: 72,
+                borderRadius: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#eef2ff',
+                color: '#4f46e5',
+                fontWeight: 800,
+                letterSpacing: 1,
+              }}>F</div>
+            )}
           </div>
           <h1 style={{
             fontSize: '28px',

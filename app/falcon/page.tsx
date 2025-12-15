@@ -300,14 +300,16 @@ export default function App() {
     '#1f3b39', // dark aqua
   ];
 
-  // Load user from localStorage
+  // Load user from localStorage and apply avatar/company logo
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
         const parsed = JSON.parse(userStr);
         setCurrentUser(parsed);
-        if (parsed?.companyLogo) {
+        if (parsed?.avatar) {
+          setCompanyLogo(parsed.avatar);
+        } else if (parsed?.companyLogo) {
           setCompanyLogo(parsed.companyLogo);
         }
       } catch (e) {
@@ -1919,6 +1921,23 @@ export default function App() {
       const dataUrl = reader.result as string;
       setCompanyLogo(dataUrl);
       localStorage.setItem('companyLogo', dataUrl);
+
+      // Persist to user profile (avatar) so it survives deployments/domains
+      try {
+        const nameForProfile = (currentUser?.name && currentUser.name.trim()) || profileName || 'User';
+        const resp = await fetch('/api/auth/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: nameForProfile, avatar: dataUrl }),
+        });
+        if (resp.ok) {
+          const updated = await resp.json();
+          setCurrentUser(updated);
+          localStorage.setItem('user', JSON.stringify(updated));
+        }
+      } catch (err) {
+        console.warn('Failed to persist logo to profile (avatar)', err);
+      }
     };
     reader.readAsDataURL(file);
 
