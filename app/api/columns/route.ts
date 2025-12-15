@@ -65,31 +65,43 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(columns);
       }
     } else {
-      // For normal view: get non-archived columns with non-archived cards
+      // For normal view: fetch lean payload (no heavy sub-relations)
       const columns = await prisma.column.findMany({
-        where: { 
+        where: {
           isArchived: false,
           ...(boardId && { boardId }),
         },
         orderBy: { order: 'asc' },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          order: true,
+          isArchived: true,
+          boardId: true,
           user: { select: { id: true, name: true, avatar: true } },
           cards: {
             where: { isArchived: false },
             orderBy: { order: 'asc' },
-            include: {
+            select: {
+              id: true,
+              columnId: true,
+              title: true,
+              description: true,
+              order: true,
+              createdAt: true,
+              dueDate: true,
               user: { select: { id: true, name: true, avatar: true } },
-              comments: { orderBy: { createdAt: 'desc' } },
-              activities: { 
-                orderBy: { createdAt: 'desc' },
-                include: { user: { select: { id: true, name: true, avatar: true } } },
-              },
-              attachments: true,
             },
           },
         },
       });
-      return NextResponse.json(columns);
+      return new NextResponse(JSON.stringify(columns), {
+        headers: {
+          'Content-Type': 'application/json',
+          // Tiny CDN cache to mask serverless cold start without harming freshness
+          'Cache-Control': 's-maxage=2, stale-while-revalidate=10',
+        },
+      });
     }
   } catch (error) {
     console.error('Error fetching columns:', error);

@@ -52,7 +52,13 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: 'desc' }
     });
 
-    return NextResponse.json(boards);
+    return new NextResponse(JSON.stringify(boards), {
+      headers: {
+        'Content-Type': 'application/json',
+        // Small CDN cache to cut cold TTFB while remaining fresh
+        'Cache-Control': 's-maxage=10, stale-while-revalidate=60',
+      },
+    });
   } catch (error) {
     console.error('Get boards error:', error);
     return NextResponse.json({ error: 'Failed to get boards' }, { status: 500 });

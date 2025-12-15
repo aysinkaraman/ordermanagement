@@ -297,18 +297,14 @@ export default function App() {
     '#1f3b39', // dark aqua
   ];
 
-  // Load user from localStorage and apply avatar/company logo
+  // Load user from localStorage (do not derive board logo from avatar)
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
         const parsed = JSON.parse(userStr);
         setCurrentUser(parsed);
-        if (parsed?.avatar) {
-          setCompanyLogo(parsed.avatar);
-        } else if (parsed?.companyLogo) {
-          setCompanyLogo(parsed.companyLogo);
-        }
+        // Board logo is loaded via loadBoardById; keep avatar unused for logo.
       } catch (e) {
         console.error('Failed to parse user', e);
       }
@@ -332,6 +328,7 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     let showTimer: any;
+    const controller = new AbortController();
     (async () => {
       try {
         // Require a selected board to avoid mixing data
@@ -354,15 +351,18 @@ export default function App() {
               setLoading(false);
             }
           } else {
-            // Only show spinner if no cache available
-            showTimer = setTimeout(() => setLoading(true), 250);
+            // Show spinner quickly if no cache; don't wait long
+            setLoading(true);
           }
         } catch {}
         let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
         if (showArchived) {
           url = `/api/columns?archived=true&mode=${archiveMode}&boardId=${encodeURIComponent(currentBoardId)}`;
         }
-        const res = await fetch(url);
+        // Ensure network fetch doesn't hang; timeout after ~3s
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
         const data = await res.json();
         if (mounted) {
           const mapped = (data || []).map(mapApiColumn);
@@ -386,6 +386,7 @@ export default function App() {
     return () => {
       mounted = false;
       clearTimeout(showTimer);
+      controller.abort();
     };
   }, [showArchived, archiveMode, currentBoardId]);
 
@@ -522,10 +523,8 @@ export default function App() {
       const response = await fetch('/api/auth/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profileName,
-          avatar: profileAvatar,
-        }),
+        // Avatar updates are disabled; send name only
+        body: JSON.stringify({ name: profileName }),
       });
 
       if (!response.ok) {
@@ -574,7 +573,7 @@ export default function App() {
       // Switch to new board
       setCurrentBoardId(newBoard.id);
       setBoardTitle(newBoard.title);
-      setCompanyLogo(localStorage.getItem('companyLogo'));
+      // Logo will be loaded from server (board.logo)
       loadBoardMembers(newBoard.id);
       setShowBoardSelector(false);
       await loadBoardById(newBoard.id);
@@ -2006,24 +2005,8 @@ export default function App() {
     reader.onload = async () => {
       const dataUrl = reader.result as string;
       setCompanyLogo(dataUrl);
-      localStorage.setItem('companyLogo', dataUrl);
-
-      // Persist to user profile (avatar) so it survives deployments/domains
-      try {
-        const nameForProfile = (currentUser?.name && currentUser.name.trim()) || profileName || 'User';
-        const resp = await fetch('/api/auth/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nameForProfile, avatar: dataUrl }),
-        });
-        if (resp.ok) {
-          const updated = await resp.json();
-          setCurrentUser(updated);
-          localStorage.setItem('user', JSON.stringify(updated));
-        }
-      } catch (err) {
-        console.warn('Failed to persist logo to profile (avatar)', err);
-      }
+      // No longer store a global companyLogo; logo is per-board.
+      try { localStorage.removeItem('companyLogo'); } catch {}
 
       // Persist per-board logo if a board is selected
       try {

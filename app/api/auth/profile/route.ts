@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { name, avatar } = await request.json();
+    const { name } = await request.json();
 
     // Validation
     if (!name || name.trim().length === 0) {
@@ -43,7 +43,8 @@ export async function PATCH(request: NextRequest) {
       where: { id: userId },
       data: {
         name: name.trim(),
-        avatar: avatar || null,
+        // Enforce initial-only avatar; ignore any uploaded avatar
+        avatar: null,
       },
     });
 
