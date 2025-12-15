@@ -72,7 +72,14 @@ type Comment = {
   id: number;
   text: string;
   author: string;
+  createdAt?: string;
+};
+
+type Activity = {
+  id: number;
+  message: string;
   createdAt: string;
+  user?: { id: string | number; name: string; avatar: string | null } | null;
 };
 
 type Attachment = {
@@ -83,17 +90,6 @@ type Attachment = {
   url: string;
   note?: string | null;
   createdAt?: string;
-};
-
-type Activity = {
-  id: number;
-  message: string;
-  createdAt: string;
-  user?: {
-    id: number;
-    name: string;
-    avatar: string | null;
-  } | null;
 };
 
 type Card = {
@@ -338,8 +334,6 @@ export default function App() {
     let showTimer: any;
     (async () => {
       try {
-        // Delay showing the spinner to avoid flicker on fast loads
-        showTimer = setTimeout(() => setLoading(true), 250);
         // Require a selected board to avoid mixing data
         if (!currentBoardId) {
           setColumns([]);
@@ -349,6 +343,21 @@ export default function App() {
           }
           return;
         }
+        // Try cached columns for instant paint (avoid loading screen)
+        try {
+          const cacheKey = `columns:${currentBoardId}:${showArchived ? `arch-${archiveMode}` : 'active'}`;
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && mounted) {
+              setColumns(parsed);
+              setLoading(false);
+            }
+          } else {
+            // Only show spinner if no cache available
+            showTimer = setTimeout(() => setLoading(true), 250);
+          }
+        } catch {}
         let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
         if (showArchived) {
           url = `/api/columns?archived=true&mode=${archiveMode}&boardId=${encodeURIComponent(currentBoardId)}`;
@@ -356,7 +365,12 @@ export default function App() {
         const res = await fetch(url);
         const data = await res.json();
         if (mounted) {
-          setColumns((data || []).map(mapApiColumn));
+          const mapped = (data || []).map(mapApiColumn);
+          setColumns(mapped);
+          try {
+            const cacheKey = `columns:${currentBoardId}:${showArchived ? `arch-${archiveMode}` : 'active'}`;
+            localStorage.setItem(cacheKey, JSON.stringify(mapped));
+          } catch {}
           setLastUpdatedAt(Date.now());
         }
       } catch (e) {
@@ -741,7 +755,8 @@ export default function App() {
     try {
       const res = await fetch('/api/boards');
       const data = await res.json();
-      setBoards(data || []);
+      const list = Array.isArray(data) ? data : [];
+      setBoards(list);
       // Do not auto-select first board here; `lastBoardId` loader handles selection.
     } catch (e) {
       console.error('Failed to load boards', e);
@@ -950,10 +965,11 @@ export default function App() {
   };
 
   // Attachments
-  const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB guard to allow larger files
-  const handlePasteAttachment = async (e: React.ClipboardEvent) => {
-    if (!activeCard) return;
+  const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
+  // Paste-to-attach (images)
+  const handlePasteAttachment = (e: React.ClipboardEvent) => {
+    if (!activeCard) return;
     const target = e.target as HTMLElement | null;
     const tag = (target?.tagName || '').toUpperCase();
     const isEditable = !!(target && (target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA'));
@@ -961,7 +977,6 @@ export default function App() {
 
     const cd = e.clipboardData;
     if (!cd) return;
-
     const items = cd.items || [];
     const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
@@ -971,7 +986,6 @@ export default function App() {
         if (blob) {
           const ext = it.type === 'image/png' ? '.png' : it.type === 'image/jpeg' ? '.jpg' : it.type === 'image/webp' ? '.webp' : '';
           const name = `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}${ext}`;
-          // Ensure we pass a File with a reasonable name
           const file = blob instanceof File ? (blob.name ? blob : new File([blob], name, { type: blob.type })) : new File([blob], name, { type: it.type });
           files.push(file);
         }
@@ -1884,7 +1898,7 @@ export default function App() {
                   {comments.map((c) => (
                     <div key={c.id} style={{ borderBottom: '1px solid #eee', paddingBottom: 6 }}>
                       <div style={{ fontWeight: 700, fontSize: 13 }}>{c.author}</div>
-                      <div style={{ color: '#777', fontSize: 12 }}>{new Date(c.createdAt).toLocaleString()}</div>
+                      <div style={{ color: '#777', fontSize: 12 }}>{new Date(c.createdAt || Date.now()).toLocaleString()}</div>
                       <div style={{ marginTop: 4, fontSize: 13 }}>{c.text}</div>
                     </div>
                   ))}
@@ -2784,11 +2798,7 @@ export default function App() {
 
           {/* Content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
-            {loading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
-            ) : (
-              renderArchivedView()
-            )}
+            {renderArchivedView()}
           </div>
         </div>
       </>
