@@ -123,6 +123,7 @@ type User = {
 };
 
 export default function App() {
+  const HIDE_HEADER_LOGO = true; // Requested: no image in board header
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2025,33 +2026,37 @@ export default function App() {
   const header = (
     <div style={{ padding: compactView ? '10px 16px' : '16px 24px', background: darkMode ? '#111827' : `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        {/* Company Logo */}
-        <div 
-          onClick={() => logoInputRef.current?.click()}
-          style={{ 
-            width: 60, 
-            height: 60, 
-            background: companyLogo ? 'transparent' : 'rgba(255,255,255,0.2)', 
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            border: 'none',
-            overflow: 'hidden',
-            flexShrink: 0
-          }}
-          title="Click to upload logo"
-        >
-          <img src={companyLogo || '/falcon.svg'} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-        <input
-          ref={logoInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleLogoUpload}
-          style={{ display: 'none' }}
-        />
+        {/* Company Logo (hidden as requested) */}
+        {HIDE_HEADER_LOGO ? null : (
+          <>
+            <div 
+              onClick={() => logoInputRef.current?.click()}
+              style={{ 
+                width: 60, 
+                height: 60, 
+                background: companyLogo ? 'transparent' : 'rgba(255,255,255,0.2)', 
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                border: 'none',
+                overflow: 'hidden',
+                flexShrink: 0
+              }}
+              title="Click to upload logo"
+            >
+              <img src={companyLogo || '/falcon.svg'} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoUpload}
+              style={{ display: 'none' }}
+            />
+          </>
+        )}
 
         {/* Company Name & Board Title */}
         <div>
