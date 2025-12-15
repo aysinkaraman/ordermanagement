@@ -1,148 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-// import crypto from 'crypto'; // TEMPORARILY DISABLED FOR DEBUGGING
 
-// TEMPORARILY DISABLED FOR DEBUGGING
-/*
-function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string): boolean {
-  const hash = crypto
-    .createHmac('sha256', secret)
-    .update(body, 'utf8')
-    .digest('base64');
-  return hash === hmacHeader;
+// Minimal stub: legacy webhook disabled. Use /api/shopify/webhooks/orders/updated instead.
+export async function POST(_request: NextRequest) {
+  return NextResponse.json({ ok: true, note: 'legacy webhook disabled; use /api/shopify/webhooks/orders/updated' });
 }
-*/
 
-// POST - Webhook endpoint for new orders
+export const runtime = 'edge';
+export const preferredRegion = 'auto';
+export const dynamic = 'force-dynamic';
+
+/*
+import { prisma } from '@/lib/prisma';
+import { normalizeTags, mapShipping, findDesigner } from '@/lib/shopify';
+// import crypto from 'crypto';
+
+// function verifyShopifyWebhook(body: string, hmacHeader: string, secret: string): boolean {
+//   const hash = crypto
+//     .createHmac('sha256', secret)
+//     .update(body, 'utf8')
+//     .digest('base64');
+//   return hash === hmacHeader;
+// }
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
-    const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256');
-    
-    console.log('🔐 Webhook received - HMAC present:', !!hmacHeader);
-    console.log('🔐 Webhook secret configured:', !!process.env.SHOPIFY_WEBHOOK_SECRET);
-    console.log('🌍 Environment:', process.env.NODE_ENV);
-    
-    // Verify webhook authenticity in production
-    // TEMPORARILY DISABLED FOR DEBUGGING
-    /*
-    if (process.env.NODE_ENV === 'production' && hmacHeader) {
-      const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
-      if (webhookSecret && !verifyShopifyWebhook(rawBody, hmacHeader, webhookSecret)) {
-        console.error('Webhook verification failed');
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    // const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256') || '';
+
+    // In production you can enable HMAC verification
+    // if (process.env.NODE_ENV === 'production') {
+    // (legacy code continues)
+    //   const secret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
+    //   if (!secret || !verifyShopifyWebhook(rawBody, hmacHeader, secret)) {
+    //     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    //   }
+    // }
+
+    let order: any;
+    try {
+      order = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
-    */
 
-    const order = JSON.parse(rawBody);
-    console.log('📦 New order webhook received:', order.order_number);
-    console.log('🔍 RAW TAGS:', order.tags);
-    console.log('🔍 TAG TYPE:', typeof order.tags);
-
-    // Check if important tags exist (priority, express, shop location, shipping)
-    // If not, wait 10 seconds for Shopify Flow to add them
-    let finalOrder = order;
-    const initialTags = (order.tags || '').toLowerCase();
-    const hasImportantTags = initialTags.includes('priority') || 
-                             initialTags.includes('express') || 
-                             initialTags.includes('shop') || 
-                             initialTags.includes('pickup') ||
-                             initialTags.includes('shipping');
-    
-    if (!hasImportantTags) {
-      console.log('⏳ No important tags found, waiting 10 seconds for Shopify Flow...');
-      console.log('📝 Initial tags were:', order.tags);
-      
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      
-      // Re-fetch order from Shopify API to get updated tags
-      try {
-        const shopifyUrl = `https://${process.env.SHOPIFY_SHOP_NAME}/admin/api/2024-01/orders/${order.id}.json`;
-        const response = await fetch(shopifyUrl, {
-          headers: {
-            'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN || '',
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          finalOrder = data.order;
-          console.log('✅ Re-fetched order from Shopify. New tags:', finalOrder.tags);
-        } else {
-          console.log('⚠️ Could not re-fetch order, using original');
-        }
-      } catch (e) {
-        console.log('⚠️ Error re-fetching order:', e);
-      }
-    } else {
-      console.log('✅ Important tags already present, no need to wait');
-    }
-    
-    // Normalize entire tag string to lowercase for matching
-    const tagString = (finalOrder.tags || '').toLowerCase();
-    
-    console.log('🏷️ RAW tag string:', finalOrder.tags);
-    console.log('🏷️ Normalized:', tagString);
-    
-    // Determine target column by checking the ENTIRE tag string
-    let targetColumn: string;
-    
-    if (tagString.includes('priority')) {
-      targetColumn = 'Priority';
-      console.log('🔥 Found "priority" in tags → Priority list');
-    } else if (tagString.includes('express')) {
-      targetColumn = 'Express';
-      console.log('⚡ Found "express" in tags → Express list');
-    } else if (tagString.includes('shop location') || tagString.includes('shop') || tagString.includes('pickup')) {
-      targetColumn = 'Pickup';
-      console.log('📍 Found shop/pickup tag in tags → Pickup list');
-    } else if (
-      tagString.includes('shipping') || 
-      tagString.includes('ground shipping') || 
-      tagString.includes('free ground shipping')
-    ) {
-      targetColumn = 'Ground';
-      console.log('🚚 Found shipping-related tag → Ground list');
-    } else {
-      targetColumn = 'Ground';
-      console.log('⚠️ No recognized tags, using default → Ground list');
-    }
-    
-    console.log('✅ FINAL ASSIGNMENT:', targetColumn);
-
-    // Always use the first available board - simpler and more reliable
-    console.log('📋 Finding first available board...');
-    const board = await prisma.board.findFirst({
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        columns: {
-          select: { id: true, title: true, order: true },
-          orderBy: { order: 'asc' }
-        }
-      },
-      orderBy: { createdAt: 'asc' }
-    });
-
-    // If no board exists, return error - DO NOT auto-create boards
-    if (!board) {
-      console.error('❌ No boards found - webhook cannot auto-create boards');
-      return NextResponse.json({ 
-        error: 'No target board found. Please create a board first or set SHOPIFY_TARGET_BOARD_ID environment variable.' 
-      }, { status: 400 });
-    }
-    
-    console.log('📋 Using board:', board.title, '(ID:', board.id, ')');
-    console.log('📋 Board columns:', board.columns.map(c => c.title).join(', '));
-
-    // Get target column
-    const column = board.columns.find(c => c.title === targetColumn);
-    
-    if (!column) {
-      console.error(`❌ Column "${targetColumn}" not found in board`);
-      return NextResponse.json({ error: `Column ${targetColumn} not found` }, { status: 500 });
+    // Poll Shopify up to 3 times (5s apart) for tags that may arrive via Flow
+    let finalOrder: any = order;
+    const fetchUpdated = async () => {
     }
     
     console.log('✅ Using column:', column.title, '(ID:', column.id, ')');
@@ -208,6 +111,7 @@ export async function POST(request: NextRequest) {
     const customerName = order.customer 
       ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()
       : 'Guest Customer';
+        labels: ['shipping', targetColumn.toLowerCase()]
 
     const shippingInfo = order.shipping_lines?.[0]?.title || 'N/A';
 
@@ -221,13 +125,39 @@ export async function POST(request: NextRequest) {
 📱 Phone: ${order.phone || 'N/A'}
 🏷️ Tags: ${order.tags || 'None'}
 
+    // Designer routing to Daily Standup
+    const whitelist = (process.env.SHOPIFY_DESIGNERS || '').split(',').map(s => s.trim());
+    const designer = findDesigner(tags, vendors, whitelist);
+    if (designer) {
+      const standupBoardId = process.env.SHOPIFY_STANDUP_BOARD_ID || null;
+      const standupBoard = standupBoardId
+        ? await prisma.board.findUnique({ where: { id: standupBoardId }, select: { id: true, title: true, columns: { select: { id: true, title: true, order: true }, orderBy: { order: 'asc' } } } })
+        : await prisma.board.findFirst({ where: { title: { contains: 'Standup', mode: 'insensitive' } }, select: { id: true, title: true, columns: { select: { id: true, title: true, order: true }, orderBy: { order: 'asc' } } } });
+      if (standupBoard) {
+        // Ensure a default column exists
+        const col = standupBoard.columns[0] || await prisma.column.create({ data: { title: 'Notes', order: 0, boardId: standupBoard.id } });
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const title = `Daily: ${designer} — ${dateStr}`;
+        const existing = await prisma.card.findFirst({ where: { columnId: col.id, title } });
+        const line = `#${order.order_number} • ${order.currency} ${order.total_price} • ${order.line_items?.length || 0} items`;
+        if (existing) {
+          // If order already listed, skip; else append
+          const already = (existing.description || '').includes(`#${order.order_number}`);
+          if (!already) {
+            await prisma.card.update({ where: { id: existing.id }, data: { description: `${existing.description || ''}\n${line}` } });
+          }
+        } else {
+          await prisma.card.create({ data: { columnId: col.id, title, description: line, order: 0, labels: ['daily', `designer:${designer.toLowerCase()}`] } });
+        }
+      }
+    }
+
 Items:
 ${order.line_items.map((item: any) => `- ${item.quantity}x ${item.name} (${order.currency} ${item.price})`).join('\n')}
 
 Shipping Address:
 ${order.shipping_address ? `
 ${order.shipping_address.address1 || ''}
-${order.shipping_address.city || ''}, ${order.shipping_address.province || ''} ${order.shipping_address.zip || ''}
 ${order.shipping_address.country || ''}
 `.trim() : 'N/A'}
     `.trim();
@@ -267,3 +197,5 @@ ${order.shipping_address.country || ''}
     );
   }
 }
+
+*/
