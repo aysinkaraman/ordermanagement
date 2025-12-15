@@ -897,12 +897,12 @@ export default function App() {
   };
 
   // Attachments
-  const MAX_ATTACHMENT_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB guard to avoid server limits
+  const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB guard to allow larger files
   const handleAddAttachment = (file: File) => {
     if (!file || !activeCard) return;
 
     if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
-      alert('Dosya çok büyük (maksimum 3 MB). Lütfen daha küçük bir dosya yükleyin.');
+      alert('Dosya çok büyük (maksimum 10 MB). Lütfen daha küçük bir dosya yükleyin.');
       return;
     }
 
@@ -931,7 +931,7 @@ export default function App() {
         });
         if (!res.ok) {
           if (res.status === 413) {
-            alert('Dosya çok büyük (maksimum 3 MB). Lütfen daha küçük bir dosya yükleyin.');
+            alert('Dosya çok büyük (maksimum 10 MB). Lütfen daha küçük bir dosya yükleyin.');
             return;
           }
           throw new Error('Upload failed');
@@ -1655,7 +1655,7 @@ export default function App() {
                 }}
               />
             </label>
-            <div style={{ fontSize: 12, color: '#6b6b7a', marginTop: 6 }}>Maksimum dosya boyutu: 3 MB (resim veya PDF önerilir)</div>
+            <div style={{ fontSize: 12, color: '#6b6b7a', marginTop: 6 }}>Maksimum dosya boyutu: 10 MB (resim veya PDF önerilir)</div>
 
             {attachments.length === 0 ? (
               <div style={{ color: '#888', fontSize: 13 }}>No files yet.</div>

@@ -18,7 +18,7 @@ export const CardModal: React.FC<CardModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const MAX_ATTACHMENT_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB client-side guard
+  const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB client-side guard
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description || '');
   const [dueDate, setDueDate] = useState<string>(card.dueDate ? new Date(card.dueDate).toISOString().slice(0, 16) : '');
@@ -179,7 +179,7 @@ export const CardModal: React.FC<CardModalProps> = ({
       const okFiles = fileArr.filter((f) => f.size <= MAX_ATTACHMENT_SIZE_BYTES);
 
       if (tooBig.length > 0) {
-        toast.error(`Bazı dosyalar çok büyük (maksimum 3 MB): ${tooBig.map(f => f.name).join(', ')}`);
+        toast.error(`Bazı dosyalar çok büyük (maksimum 10 MB): ${tooBig.map(f => f.name).join(', ')}`);
       }
 
       const uploaded = await Promise.all(
@@ -204,7 +204,7 @@ export const CardModal: React.FC<CardModalProps> = ({
       }
     } catch (error: any) {
       if (error?.response?.status === 413) {
-        toast.error('Dosya çok büyük (maksimum 3 MB). Daha küçük bir dosya deneyin.');
+        toast.error('Dosya çok büyük (maksimum 10 MB). Daha küçük bir dosya deneyin.');
       } else {
         toast.error('Dosya yüklenemedi');
       }
@@ -433,7 +433,7 @@ export const CardModal: React.FC<CardModalProps> = ({
               >
                 {uploading ? 'Uploading...' : '📎 Add Attachment'}
               </label>
-              <p className="text-xs text-gray-500 mt-2">Maksimum dosya boyutu: 3 MB (resim veya PDF önerilir)</p>
+              <p className="text-xs text-gray-500 mt-2">Maksimum dosya boyutu: 10 MB (resim veya PDF önerilir)</p>
             </div>
 
             {/* Attachments List */}

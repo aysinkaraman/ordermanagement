@@ -15,12 +15,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Server-side safety guard for payload size (3 MB max)
-    const MAX_BYTES = 3 * 1024 * 1024;
+    // Server-side safety guard for payload size (10 MB max)
+    const MAX_BYTES = 10 * 1024 * 1024;
     const declaredSize = Number(size || 0);
     if (declaredSize > MAX_BYTES) {
       return NextResponse.json(
-        { error: 'File too large (max 3 MB)' },
+        { error: 'File too large (max 10 MB)' },
         { status: 413 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         const estimatedBytes = Math.floor((b64.length * 3) / 4);
         if (estimatedBytes > MAX_BYTES) {
           return NextResponse.json(
-            { error: 'File too large (max 3 MB)' },
+            { error: 'File too large (max 10 MB)' },
             { status: 413 }
           );
         }
