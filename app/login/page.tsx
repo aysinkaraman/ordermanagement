@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -55,25 +54,7 @@ export default function LoginPage() {
     });
   };
 
-  // Try to show company logo or user's avatar if available
-  useEffect(() => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const parsed = JSON.parse(userStr);
-        if (parsed?.avatar) {
-          setLogoUrl(parsed.avatar);
-          return;
-        }
-        if (parsed?.companyLogo) {
-          setLogoUrl(parsed.companyLogo);
-          return;
-        }
-      }
-      const savedLogo = localStorage.getItem('companyLogo');
-      if (savedLogo) setLogoUrl(savedLogo);
-    } catch {}
-  }, []);
+  // No logo image on login page as requested
 
   return (
     <div style={{
@@ -92,15 +73,8 @@ export default function LoginPage() {
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         padding: '40px',
       }}>
-        {/* Logo */}
+        {/* Title only (no image) */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{ marginBottom: '10px' }}>
-            <img
-              src={logoUrl || '/falcon.svg'}
-              alt="Logo"
-              style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'inline-block' }}
-            />
-          </div>
           <h1 style={{
             fontSize: '28px',
             fontWeight: 'bold',

@@ -86,6 +86,7 @@ model Board {
   teamId         String?
   primaryColor   String        @default("#D97706")
   secondaryColor String        @default("#92400E")
+  logo           String?
   owner          User          @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   team           Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
   members        BoardMember[]

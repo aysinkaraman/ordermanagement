@@ -22,12 +22,14 @@ export async function GET(
           { isPublic: true }
         ]
       },
-      select: {
+      // Use any-cast to allow selecting fields added by migration before prisma client regen
+      select: ({
         id: true,
         title: true,
         isPublic: true,
         ownerId: true,
         teamId: true,
+        logo: true,
         createdAt: true,
         updatedAt: true,
         owner: {
@@ -68,7 +70,7 @@ export async function GET(
           },
           orderBy: { order: 'asc' }
         }
-      }
+      } as any)
     });
 
     if (!board) {
@@ -93,7 +95,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { title, isPublic } = await request.json();
+    const { title, isPublic, logo } = await request.json();
 
     // Check if user is owner or admin
     const board = await prisma.board.findFirst({
@@ -112,10 +114,11 @@ export async function PATCH(
 
     const updatedBoard = await prisma.board.update({
       where: { id: params.id },
-      data: {
+      data: ({
         ...(title !== undefined && { title }),
-        ...(isPublic !== undefined && { isPublic })
-      }
+        ...(isPublic !== undefined && { isPublic }),
+        ...(logo !== undefined && { logo })
+      } as any)
     });
 
     return NextResponse.json(updatedBoard);

@@ -123,7 +123,6 @@ type User = {
 };
 
 export default function App() {
-  const HIDE_HEADER_LOGO = true; // Requested: no image in board header
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(false);
@@ -215,6 +214,7 @@ export default function App() {
       setColumns(cols);
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
+      if (board.logo) setCompanyLogo(board.logo);
       applyBoardTheme(board.id, board.title || '');
       try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
@@ -951,6 +951,44 @@ export default function App() {
 
   // Attachments
   const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB guard to allow larger files
+  const handlePasteAttachment = async (e: React.ClipboardEvent) => {
+    if (!activeCard) return;
+
+    const target = e.target as HTMLElement | null;
+    const tag = (target?.tagName || '').toUpperCase();
+    const isEditable = !!(target && (target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA'));
+    if (isEditable) return; // don't hijack paste inside text inputs
+
+    const cd = e.clipboardData;
+    if (!cd) return;
+
+    const items = cd.items || [];
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it && it.kind === 'file' && it.type.startsWith('image/')) {
+        const blob = it.getAsFile();
+        if (blob) {
+          const ext = it.type === 'image/png' ? '.png' : it.type === 'image/jpeg' ? '.jpg' : it.type === 'image/webp' ? '.webp' : '';
+          const name = `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}${ext}`;
+          // Ensure we pass a File with a reasonable name
+          const file = blob instanceof File ? (blob.name ? blob : new File([blob], name, { type: blob.type })) : new File([blob], name, { type: it.type });
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      e.preventDefault();
+      for (const f of files) {
+        if (f.size > MAX_ATTACHMENT_SIZE_BYTES) {
+          alert('Dosya çok büyük (maksimum 10 MB). Lütfen daha küçük bir dosya yükleyin.');
+          continue;
+        }
+        handleAddAttachment(f);
+      }
+    }
+  };
   const handleAddAttachment = (file: File) => {
     if (!file || !activeCard) return;
 
@@ -1599,6 +1637,7 @@ export default function App() {
       >
         <div
           onClick={(e) => e.stopPropagation()}
+          onPaste={handlePasteAttachment}
           style={{
             background: '#fff',
             borderRadius: 12,
@@ -1939,6 +1978,19 @@ export default function App() {
       } catch (err) {
         console.warn('Failed to persist logo to profile (avatar)', err);
       }
+
+      // Persist per-board logo if a board is selected
+      try {
+        if (currentBoardId) {
+          await fetch(`/api/boards/${currentBoardId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ logo: dataUrl }),
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to persist logo to board', err);
+      }
     };
     reader.readAsDataURL(file);
 
@@ -2026,37 +2078,35 @@ export default function App() {
   const header = (
     <div style={{ padding: compactView ? '10px 16px' : '16px 24px', background: darkMode ? '#111827' : `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        {/* Company Logo (hidden as requested) */}
-        {HIDE_HEADER_LOGO ? null : (
-          <>
-            <div 
-              onClick={() => logoInputRef.current?.click()}
-              style={{ 
-                width: 60, 
-                height: 60, 
-                background: companyLogo ? 'transparent' : 'rgba(255,255,255,0.2)', 
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                border: 'none',
-                overflow: 'hidden',
-                flexShrink: 0
-              }}
-              title="Click to upload logo"
-            >
-              <img src={companyLogo || '/falcon.svg'} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              style={{ display: 'none' }}
-            />
-          </>
-        )}
+        {/* Company Logo */}
+        <div 
+          onClick={() => logoInputRef.current?.click()}
+          style={{ 
+            width: 60, 
+            height: 60, 
+            background: companyLogo ? 'transparent' : 'rgba(255,255,255,0.2)', 
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            border: 'none',
+            overflow: 'hidden',
+            flexShrink: 0
+          }}
+          title="Click to upload logo"
+        >
+          {companyLogo ? (
+            <img src={companyLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : null}
+        </div>
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleLogoUpload}
+          style={{ display: 'none' }}
+        />
 
         {/* Company Name & Board Title */}
         <div>
@@ -3318,10 +3368,42 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>📊 {board._count?.columns || 0} lists</span>
                   <span>👥 {board._count?.members || 0} members</span>
                   <span>🗓️ Created {new Date(board.createdAt).toLocaleDateString()}</span>
+                  {/* Set Board Logo (does not display it on header) */}
+                  <label style={{ marginLeft: 'auto', cursor: 'pointer', fontSize: 12, color: '#1d4ed8' }} title="Set board logo (hidden in header)">
+                    Set logo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        e.stopPropagation();
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        try {
+                          const reader = new FileReader();
+                          reader.onload = async () => {
+                            const dataUrl = reader.result as string;
+                            await fetch(`/api/boards/${board.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ logo: dataUrl }),
+                            });
+                            if (currentBoardId === board.id) setCompanyLogo(dataUrl);
+                            alert('✅ Board logo saved');
+                          };
+                          reader.readAsDataURL(f);
+                        } catch (err) {
+                          alert('❌ Failed to save board logo');
+                        } finally {
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
               </div>
             ))}

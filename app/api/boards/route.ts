@@ -27,12 +27,14 @@ export async function GET(request: NextRequest) {
           { members: { some: { userId } } }
         ]
       },
-      select: {
+      // any-cast select to include new 'logo' before prisma regenerate
+      select: ({
         id: true,
         title: true,
         isPublic: true,
         ownerId: true,
         teamId: true,
+        logo: true,
         createdAt: true,
         updatedAt: true,
         owner: {
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
           }
         },
         _count: { select: { columns: true, members: true } }
-      },
+      } as any),
       orderBy: { updatedAt: 'desc' }
     });
 
@@ -85,16 +87,17 @@ export async function POST(request: NextRequest) {
           isPublic: isPublic || false,
           ownerId: userId
         },
-        select: {
+        select: ({
           id: true,
           title: true,
           isPublic: true,
           ownerId: true,
           teamId: true,
+          logo: true,
           createdAt: true,
           updatedAt: true,
           owner: { select: { id: true, name: true, email: true, avatar: true } }
-        }
+        } as any)
       });
     } catch (err: any) {
       // Fallback for prod DB missing extra columns (e.g., primaryColor)
