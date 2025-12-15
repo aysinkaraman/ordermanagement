@@ -2043,11 +2043,7 @@ export default function App() {
           }}
           title="Click to upload logo"
         >
-          {companyLogo ? (
-            <img src={companyLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <span style={{ fontSize: 24 }}>🏢</span>
-          )}
+          <img src={companyLogo || '/falcon.svg'} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <input
           ref={logoInputRef}

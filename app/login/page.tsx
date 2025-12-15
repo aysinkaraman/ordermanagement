@@ -95,22 +95,11 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <div style={{ marginBottom: '10px' }}>
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'inline-block' }} />
-            ) : (
-              <div style={{
-                width: 72,
-                height: 72,
-                borderRadius: 12,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#eef2ff',
-                color: '#4f46e5',
-                fontWeight: 800,
-                letterSpacing: 1,
-              }}>F</div>
-            )}
+            <img
+              src={logoUrl || '/falcon.svg'}
+              alt="Logo"
+              style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'inline-block' }}
+            />
           </div>
           <h1 style={{
             fontSize: '28px',
