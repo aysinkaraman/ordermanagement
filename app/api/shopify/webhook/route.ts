@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Minimal stub: legacy webhook disabled. Use /api/shopify/webhooks/orders/updated instead.
-export async function POST(_request: NextRequest) {
-  return NextResponse.json({ ok: true, note: 'legacy webhook disabled; use /api/shopify/webhooks/orders/updated' });
+// Backward-compatible proxy: forward legacy webhook to the active orders/updated handler.
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const hmac = request.headers.get('x-shopify-hmac-sha256') || '';
+    const target = new URL('/api/shopify/webhooks/orders/updated', request.nextUrl);
+    const res = await fetch(target, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(hmac ? { 'x-shopify-hmac-sha256': hmac } : {}),
+      },
+      body,
+    });
+    const json = await res.json().catch(() => ({ ok: res.ok }));
+    return NextResponse.json(json, { status: res.status });
+  } catch (error: any) {
+    console.error('Legacy webhook proxy error:', error);
+    return NextResponse.json({ error: error.message || 'Proxy failed' }, { status: 500 });
+  }
 }
 
 export const runtime = 'edge';
