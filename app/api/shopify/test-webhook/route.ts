@@ -38,16 +38,23 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // Call the actual webhook endpoint
-    const webhookUrl = `${request.nextUrl.origin}/api/shopify/webhook`;
+    // Call the actual orders/updated webhook endpoint with valid HMAC
+    const webhookUrl = `${request.nextUrl.origin}/api/shopify/webhooks/orders/updated`;
     console.log('🧪 Testing webhook with URL:', webhookUrl);
-    
+
+    const body = JSON.stringify(testOrder);
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (secret) {
+      const crypto = await import('crypto');
+      const hmac = crypto.createHmac('sha256', secret).update(body, 'utf8').digest('base64');
+      headers['x-shopify-hmac-sha256'] = hmac;
+    }
+
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(testOrder),
+      headers,
+      body,
     });
 
     const result = await response.json();

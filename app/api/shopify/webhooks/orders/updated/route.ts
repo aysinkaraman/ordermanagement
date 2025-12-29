@@ -58,6 +58,27 @@ async function ensureStandupBoard(ownerId?: string) {
   return board;
 }
 
+async function ensureFalconBoard(): Promise<{ id: string; title: string } | null> {
+  const title = 'Falcon Board';
+  // Try to find existing Falcon board by title
+  let board = await prisma.board.findFirst({ where: { title: { contains: 'Falcon', mode: 'insensitive' } }, select: { id: true, title: true, ownerId: true } });
+  if (board) return { id: board.id, title: board.title };
+  // Create if missing, using configured owner or first user as fallback
+  const ownerEmail = process.env.FALCON_OWNER_EMAIL || process.env.STANDUP_OWNER_EMAIL || '';
+  let ownerId: string | null = null;
+  if (ownerEmail) {
+    const owner = await prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } });
+    if (owner) ownerId = owner.id;
+  }
+  if (!ownerId) {
+    const first = await prisma.user.findFirst({ select: { id: true } });
+    if (first) ownerId = first.id;
+  }
+  if (!ownerId) return null;
+  const created = await prisma.board.create({ data: { title, isPublic: false, ownerId }, select: { id: true, title: true } });
+  return created;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
@@ -84,9 +105,12 @@ export async function POST(request: NextRequest) {
     // 1) Shipping → Falcon Board (always handle shipping based on tags)
     const shippingColumnName = mapShipping(`${tagsStr} ${shippingTitle}`.trim());
     const falconBoardId = process.env.SHOPIFY_FALCON_BOARD_ID || null;
-    const falconBoard = falconBoardId
+    let falconBoard = falconBoardId
       ? await prisma.board.findUnique({ where: { id: falconBoardId }, select: { id: true, title: true } })
       : await prisma.board.findFirst({ where: { title: { contains: 'Falcon', mode: 'insensitive' } }, select: { id: true, title: true } });
+    if (!falconBoard) {
+      falconBoard = await ensureFalconBoard();
+    }
     if (falconBoard) {
       const allowedShipping = ['Ground', 'Pickup', 'Express', 'Priority'];
       const allowedLower = allowedShipping.map((s) => s.toLowerCase());
