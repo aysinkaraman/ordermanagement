@@ -83,8 +83,12 @@ export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
     const hmacHeader = request.headers.get('x-shopify-hmac-sha256');
+    const allowUnverified = (process.env.SHOPIFY_WEBHOOK_ALLOW_UNVERIFIED || 'false').toLowerCase() === 'true';
     if (!verifyShopifyHmac(rawBody, hmacHeader)) {
-      return NextResponse.json({ error: 'Invalid HMAC' }, { status: 401 });
+      if (!allowUnverified) {
+        return NextResponse.json({ error: 'Invalid HMAC' }, { status: 401 });
+      }
+      console.warn('Webhook HMAC invalid, but processing allowed due to SHOPIFY_WEBHOOK_ALLOW_UNVERIFIED=true');
     }
 
     const payload = JSON.parse(rawBody);
@@ -157,7 +161,8 @@ export async function POST(request: NextRequest) {
           });
           await prisma.activity.create({ data: { cardId: card.id, message: `Webhook: created in ${shippingColumnName}` } });
         } else {
-          await prisma.activity.create({ data: { message: `Webhook: skipped create (non-shipping list ${shippingColumnName})`, cardId: undefined as any } });
+          // Skip creation for non-shipping lists; log only
+          console.info(`Webhook: skipped create (non-shipping list ${shippingColumnName}) for order #${orderNumber}`);
         }
       }
     }
