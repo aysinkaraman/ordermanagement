@@ -19,6 +19,15 @@ export async function GET(request: NextRequest) {
     }
     if (!userId) return NextResponse.json([]);
 
+    const { searchParams } = new URL(request.url);
+    const pageParam = Number(searchParams.get('page') || '1');
+    const limitParam = Number(searchParams.get('limit') || '20');
+    const includeMembers = searchParams.get('includeMembers') === 'true';
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    const limitRaw = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 20;
+    const limit = Math.min(Math.max(limitRaw, 1), 50); // cap to protect DB/memory
+    const skip = (page - 1) * limit;
+
     // Get boards where user is owner OR member
     const boards = await prisma.board.findMany({
       where: {
@@ -40,16 +49,32 @@ export async function GET(request: NextRequest) {
         owner: {
           select: { id: true, name: true, email: true, avatar: true }
         },
-        members: {
-          select: {
-            id: true,
-            role: true,
-            user: { select: { id: true, name: true, email: true, avatar: true } }
-          }
-        },
+        ...(includeMembers
+          ? {
+              members: {
+                select: {
+                  id: true,
+                  role: true,
+                  user: { select: { id: true, name: true, email: true, avatar: true } }
+                }
+              }
+            }
+          : {}),
         _count: { select: { columns: true, members: true } }
       } as any),
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take: limit
+    });
+
+    // Lightweight total count for pagination (optional but useful); protect with cheap count
+    const total = await prisma.board.count({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      }
     });
 
     return new NextResponse(JSON.stringify(boards), {
@@ -57,6 +82,9 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/json',
         // Small CDN cache to cut cold TTFB while remaining fresh
         'Cache-Control': 's-maxage=10, stale-while-revalidate=60',
+        'X-Total-Count': String(total),
+        'X-Page': String(page),
+        'X-Limit': String(limit),
       },
     });
   } catch (error) {

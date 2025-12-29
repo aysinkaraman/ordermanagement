@@ -13,6 +13,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const cardsLimitParam = Number(searchParams.get('cardsLimit') || '200');
+    const cardsLimitRaw = Number.isFinite(cardsLimitParam) && cardsLimitParam > 0 ? cardsLimitParam : 200;
+    const cardsLimit = Math.min(cardsLimitRaw, 500); // hard cap per column to avoid OOM
+
     const board = await prisma.board.findFirst({
       where: {
         id: params.id,
@@ -65,7 +70,8 @@ export async function GET(
                 dueDate: true,
                 coverImage: true,
                 labels: true,
-              }
+              },
+              take: cardsLimit
             }
           },
           orderBy: { order: 'asc' }
@@ -77,7 +83,11 @@ export async function GET(
       return NextResponse.json({ error: 'Board not found' }, { status: 404 });
     }
 
-    return NextResponse.json(board);
+    return NextResponse.json(board, {
+      headers: {
+        'Cache-Control': 's-maxage=10, stale-while-revalidate=60'
+      }
+    });
   } catch (error) {
     console.error('Get board error:', error);
     return NextResponse.json({ error: 'Failed to get board' }, { status: 500 });
