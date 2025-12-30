@@ -37,19 +37,7 @@ export function mapShipping(tagString: string): string {
 }
 
 // Find designer name from tags/vendors against whitelist
-export function findDesigner(tags: string[], vendors: string[], whitelist: string[]): string | null {
-  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, ' ');
-  const wl = whitelist.map(norm);
-  for (const t of tags) {
-    const nt = norm(t);
-    if (wl.includes(nt)) return whitelist[wl.indexOf(nt)];
-  }
-  for (const v of vendors) {
-    const nv = norm(v);
-    if (wl.includes(nv)) return whitelist[wl.indexOf(nv)];
-  }
-  return null;
-}
+// Designer detection removed; app focuses solely on order-to-board mapping.
 
 // Fetch a Shopify order by ID using Admin REST API
 export async function getOrderById(orderId: number | string): Promise<any | null> {
