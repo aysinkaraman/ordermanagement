@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
-import bcrypt from 'bcryptjs';
 function makeCuid() {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let s = 'c';
@@ -12,12 +11,10 @@ function makeCuid() {
 // GET /api/boards - Get all boards user has access to
 export async function GET(request: NextRequest) {
   try {
-    let userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromRequest(request);
     if (!userId) {
-      const first = await prisma.user.findFirst({ select: { id: true } });
-      if (first) userId = first.id;
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!userId) return NextResponse.json([]);
 
     const { searchParams } = new URL(request.url);
     const pageParam = Number(searchParams.get('page') || '1');
@@ -96,19 +93,9 @@ export async function GET(request: NextRequest) {
 // POST /api/boards - Create new board
 export async function POST(request: NextRequest) {
   try {
-    let userId = getUserIdFromRequest(request);
+    const userId = getUserIdFromRequest(request);
     if (!userId) {
-      const first = await prisma.user.findFirst({ select: { id: true } });
-      if (first) {
-        userId = first.id;
-      } else {
-        // Bootstrap a default owner if no users exist
-        const email = process.env.STANDUP_OWNER_EMAIL || 'owner@example.com';
-        const name = 'Owner';
-        const passwordHash = await bcrypt.hash('bootstrap-owner', 10);
-        const owner = await prisma.user.create({ data: { email, name, password: passwordHash } });
-        userId = owner.id;
-      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { title, isPublic } = await request.json();

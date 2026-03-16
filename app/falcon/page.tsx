@@ -199,9 +199,19 @@ export default function App() {
 
   const loadBoardById = async (boardId: string) => {
     try {
-      const res = await fetch(`/api/boards/${boardId}`);
+      const res = await fetch(`/api/boards/${boardId}`, {
+        headers: {
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+      });
       const board = await res.json();
-      if (!res.ok) throw new Error(board.error || 'Failed to load board');
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
+          try { localStorage.removeItem('lastBoardId'); } catch {}
+          setCurrentBoardId(null);
+        }
+        throw new Error(board.error || 'Failed to load board');
+      }
       const cols = (board.columns || []).map((c: any) => ({
         id: c.id,
         name: (c.name && String(c.name).trim()) ? c.name : (c.title && String(c.title).trim()) ? c.title : 'List',
@@ -774,8 +784,13 @@ export default function App() {
   // Load boards list
   const loadBoards = async () => {
     try {
-      const res = await fetch('/api/boards');
+      const res = await fetch('/api/boards', {
+        headers: {
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+      });
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to load boards');
       const list = Array.isArray(data) ? data : [];
       setBoards(list);
       // Do not auto-select first board here; `lastBoardId` loader handles selection.
