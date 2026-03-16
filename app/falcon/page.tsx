@@ -622,7 +622,10 @@ export default function App() {
 
       const response = await fetch(`/api/boards/${boardId}/members`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
         body: JSON.stringify({ email: shareEmail, role: shareRole }),
       });
       const data = await response.json();
@@ -657,7 +660,11 @@ export default function App() {
 
   const loadBoardMembers = async (boardId: string) => {
     try {
-      const response = await fetch(`/api/boards/${boardId}/members`);
+      const response = await fetch(`/api/boards/${boardId}/members`, {
+        headers: {
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+      });
       const data = await response.json();
       setBoardMembers(data);
     } catch (e) {
@@ -670,7 +677,12 @@ export default function App() {
     if (!currentBoardId) return;
 
     try {
-      await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, { method: 'DELETE' });
+      await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, {
+        method: 'DELETE',
+        headers: {
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+      });
       alert('✅ Member removed');
       loadBoardMembers(currentBoardId);
     } catch (e: any) {
