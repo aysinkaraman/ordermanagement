@@ -1262,22 +1262,45 @@ export default function App() {
     if (draggingColumnId) e.preventDefault();
   };
 
-  const handleColumnDrop = (e: React.DragEvent, targetColumnId: string | number) => {
+  const handleColumnDrop = async (e: React.DragEvent, targetColumnId: string | number) => {
     e.preventDefault();
-    if (!draggingColumnId || draggingColumnId === targetColumnId) {
+    if (!draggingColumnId || String(draggingColumnId) === String(targetColumnId)) {
       setDraggingColumnId(null);
       return;
     }
-    setColumns((prev) => {
-      const next = [...prev];
-      const fromIdx = next.findIndex((c) => c.id === draggingColumnId);
-      const toIdx = next.findIndex((c) => c.id === targetColumnId);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
+
+    const next = [...columns];
+    const fromIdx = next.findIndex((c) => String(c.id) === String(draggingColumnId));
+    const toIdx = next.findIndex((c) => String(c.id) === String(targetColumnId));
+    if (fromIdx === -1 || toIdx === -1) {
+      setDraggingColumnId(null);
+      return;
+    }
+
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setColumns(next);
     setDraggingColumnId(null);
+
+    // Persist list order so it doesn't reset after refresh/polling
+    try {
+      await Promise.all(
+        next.map((c, idx) =>
+          fetch(`/api/columns/${c.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+            },
+            body: JSON.stringify({ order: idx }),
+          })
+        )
+      );
+    } catch (e) {
+      console.error('Persist column order failed', e);
+      // Recover from server truth if persistence fails
+      await refreshColumns();
+    }
   };
 
   // List Actions
