@@ -15,20 +15,20 @@ export async function POST(
 
     const { email, role } = await request.json();
 
-    // Check if user is owner or admin
+    // Check if user can share this board (owner or any existing member)
     const board = await prisma.board.findFirst({
       where: {
         id: params.id,
         OR: [
           { ownerId: userId },
-          { members: { some: { userId, role: { in: ['owner', 'admin'] } } } }
+          { members: { some: { userId } } }
         ]
       },
       select: { id: true, ownerId: true }
     });
 
     if (!board) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+      return NextResponse.json({ error: 'Not authorized to share this board' }, { status: 403 });
     }
 
     // Find user by email
