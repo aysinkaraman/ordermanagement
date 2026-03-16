@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const inviteLink = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/register?invite=${token}`;
+    const inviteLink = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/login?invite=${token}`;
 
     return NextResponse.json({
       message: 'Invitation created',

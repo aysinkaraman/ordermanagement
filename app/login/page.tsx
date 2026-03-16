@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
+  const [inviteToken, setInviteToken] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -11,6 +12,17 @@ export default function LoginPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('invite') || '';
+    setInviteToken(token);
+  }, []);
+
+  useEffect(() => {
+    if (inviteToken) {
+      setIsLogin(false);
+    }
+  }, [inviteToken]);
   
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,12 +32,17 @@ export default function LoginPage() {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const payload = {
+        ...formData,
+        ...(!isLogin && inviteToken ? { inviteToken } : {}),
+      };
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -34,9 +51,13 @@ export default function LoginPage() {
         throw new Error(data.error || 'Something went wrong');
       }
 
-      // Store token
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Store token when returned
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
 
       // Redirect to board using window.location for full page reload
       window.location.href = '/falcon';

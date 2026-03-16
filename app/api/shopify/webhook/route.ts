@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       }
       return { num: null, display: `#${o?.id ?? 'unknown'}` };
     };
-    const { num: orderNumber, display: orderNumberDisplay } = resolveOrderNumber(order);
+    const { display: orderNumberDisplay } = resolveOrderNumber(order);
 
     // Determine shipping list only from tags
     const shippingColumnName = mapShipping(tagsStr);
@@ -99,8 +99,10 @@ export async function POST(request: NextRequest) {
         const currentTitle = String(existingShippingCard.column.title || '').trim();
         const currentIsShipping = allowedLower.includes(currentTitle.toLowerCase());
         if (!isProtected && currentIsShipping && existingShippingCard.columnId !== shippingCol.id) {
-          const moved = await prisma.card.update({ where: { id: existingShippingCard.id }, data: { columnId: shippingCol.id } });
-          await prisma.activity.create({ data: { cardId: moved.id, message: `Webhook: moved to ${shippingColumnName} by shipping tag` } });
+          const maxOrderCardForTarget = await prisma.card.findFirst({ where: { columnId: shippingCol.id }, orderBy: { order: 'desc' } });
+          const nextOrderForTarget = (maxOrderCardForTarget?.order ?? -1) + 1;
+          const moved = await prisma.card.update({ where: { id: existingShippingCard.id }, data: { columnId: shippingCol.id, order: nextOrderForTarget } });
+          await prisma.activity.create({ data: { cardId: moved.id, message: `Webhook: moved to ${shippingColumnName} by shipping tag (placed at bottom)` } });
         } else if (isProtected) {
           await prisma.activity.create({ data: { cardId: existingShippingCard.id, message: `Webhook: skipped move (protected column ${existingShippingCard.column.title})` } });
         } else if (!currentIsShipping) {

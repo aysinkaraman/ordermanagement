@@ -54,7 +54,7 @@ export async function POST(
         }
       });
 
-      const inviteLink = `https://falconordermanagement.com/register?invite=${token}`;
+      const inviteLink = `https://falconordermanagement.com/login?invite=${token}`;
 
       return NextResponse.json({ 
         message: 'Invitation sent! Share this link with them.',

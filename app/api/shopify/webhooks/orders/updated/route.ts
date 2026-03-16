@@ -2,21 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { mapShipping } from '@/lib/shopify';
 
-function verifyShopifyHmac(body: string, hmacHeader?: string | null): boolean {
-  try {
-    const secret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
-    if (!secret || !hmacHeader) return false;
-    const crypto = require('crypto');
-    const digest = crypto.createHmac('sha256', secret).update(body, 'utf8').digest('base64');
-    // Timing-safe compare
-    const a = Buffer.from(digest);
-    const b = Buffer.from(hmacHeader);
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
+// HMAC verification removed; this route processes requests without signature checks.
 
 // Standup board logic removed per requirement; only shipping board is handled.
 
@@ -44,8 +30,7 @@ async function ensureFalconBoard(): Promise<{ id: string; title: string } | null
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
-    // HMAC verification disabled: process all incoming webhooks without signature check
-    // Note: to re-enable, restore verification against 'x-shopify-hmac-sha256' using your secret.
+    // HMAC verification disabled: process all incoming webhooks without signature check.
 
     const payload = JSON.parse(rawBody);
     const order = payload;
@@ -96,9 +81,11 @@ export async function POST(request: NextRequest) {
         const isProtected = protectedCols.includes(String(existingShippingCard.column.title).trim());
         const currentTitle = String(existingShippingCard.column.title || '').trim();
         const currentIsShipping = allowedLower.includes(currentTitle.toLowerCase());
-        if (!isProtected && currentIsShipping && existingShippingCard.columnId !== shippingCol.id) {
-          const moved = await prisma.card.update({ where: { id: existingShippingCard.id }, data: { columnId: shippingCol.id } });
-          await prisma.activity.create({ data: { cardId: moved.id, message: `Webhook: moved to ${shippingColumnName} by shipping tag` } });
+          if (!isProtected && currentIsShipping && existingShippingCard.columnId !== shippingCol.id) {
+            const maxOrderCardForTarget = await prisma.card.findFirst({ where: { columnId: shippingCol.id }, orderBy: { order: 'desc' } });
+            const nextOrderForTarget = (maxOrderCardForTarget?.order ?? -1) + 1;
+            const moved = await prisma.card.update({ where: { id: existingShippingCard.id }, data: { columnId: shippingCol.id, order: nextOrderForTarget } });
+            await prisma.activity.create({ data: { cardId: moved.id, message: `Webhook: moved to ${shippingColumnName} by shipping tag (placed at bottom)` } });
         } else if (isProtected) {
           // Respect manual moves into protected columns
           await prisma.activity.create({ data: { cardId: existingShippingCard.id, message: `Webhook: skipped move (protected column ${existingShippingCard.column.title})` } });
