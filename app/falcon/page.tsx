@@ -689,16 +689,22 @@ export default function App() {
     if (!currentBoardId) return;
 
     try {
-      await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, {
+      const response = await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, {
         method: 'DELETE',
         headers: {
           ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
         },
       });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to remove member');
+      }
+
       alert('✅ Member removed');
       loadBoardMembers(currentBoardId);
     } catch (e: any) {
-      alert('❌ Failed to remove member');
+      alert(`❌ ${e.message || 'Failed to remove member'}`);
     }
   };
 
