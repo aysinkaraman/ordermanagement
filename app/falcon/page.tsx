@@ -146,6 +146,7 @@ export default function App() {
   });
 
   const [draggingColumnId, setDraggingColumnId] = useState<string | number | null>(null);
+  const [reorderingColumns, setReorderingColumns] = useState(false);
   const [openListMenuId, setOpenListMenuId] = useState<string | number | null>(null);
   const [openSortMenuId, setOpenSortMenuId] = useState<string | number | null>(null);
   // Remove columnSettings and color picker, use pastel color by index
@@ -413,6 +414,7 @@ export default function App() {
   // Silent refresh helper (no spinner)
   const refreshColumns = async () => {
     if (!currentBoardId) return;
+    if (reorderingColumns) return;
     try {
       let url = `/api/columns?boardId=${encodeURIComponent(currentBoardId)}`;
       if (showArchived) {
@@ -434,7 +436,7 @@ export default function App() {
       refreshColumns();
     }, 15000);
     return () => clearInterval(id);
-  }, [currentBoardId, showArchived, archiveMode]);
+  }, [currentBoardId, showArchived, archiveMode, reorderingColumns]);
 
   // Refresh when tab becomes visible again
   useEffect(() => {
@@ -1282,28 +1284,31 @@ export default function App() {
     setColumns(next);
     setDraggingColumnId(null);
 
-    // Persist list order so it doesn't reset after refresh/polling
+    // Persist list order atomically so it doesn't reset after refresh/polling
     try {
-      const persistResults = await Promise.all(
-        next.map((c, idx) =>
-          fetch(`/api/columns/${c.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
-            },
-            body: JSON.stringify({ order: idx }),
-          })
-        )
-      );
+      setReorderingColumns(true);
+      const res = await fetch('/api/columns/reorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+        body: JSON.stringify({
+          boardId: currentBoardId,
+          orderedColumnIds: next.map((c) => String(c.id)),
+        }),
+      });
 
-      if (persistResults.some((r) => !r.ok)) {
-        throw new Error('One or more column order updates failed');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Column reorder failed');
       }
     } catch (e) {
       console.error('Persist column order failed', e);
       // Recover from server truth if persistence fails
       await refreshColumns();
+    } finally {
+      setReorderingColumns(false);
     }
   };
 
