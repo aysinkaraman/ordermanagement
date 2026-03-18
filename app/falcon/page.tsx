@@ -182,6 +182,7 @@ export default function App() {
   const [boardMembers, setBoardMembers] = useState<any[]>([]);
   const [sharingLoading, setSharingLoading] = useState(false);
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
+  const [currentBoardOwnerId, setCurrentBoardOwnerId] = useState<string | null>(null);
   const [boards, setBoards] = useState<any[]>([]);
   const [showBoardSelector, setShowBoardSelector] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState('');
@@ -221,6 +222,7 @@ export default function App() {
       setColumns(cols);
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
+      setCurrentBoardOwnerId(board.ownerId || null);
       if (board.logo) {
         setCompanyLogo(board.logo);
       } else {
@@ -686,6 +688,10 @@ export default function App() {
 
   const canCurrentUserManageBoardMembers = () => {
     if (!currentUser || !currentBoardId) return false;
+
+    if (currentBoardOwnerId && String(currentBoardOwnerId) === String(currentUser.id)) {
+      return true;
+    }
 
     const activeBoard = boards.find((b: any) => String(b.id) === String(currentBoardId));
     const isOwner = String(activeBoard?.ownerId || '') === String(currentUser.id);
