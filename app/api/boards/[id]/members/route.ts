@@ -122,7 +122,13 @@ export async function GET(
           { isPublic: true }
         ]
       },
-      select: { id: true }
+      select: {
+        id: true,
+        ownerId: true,
+        owner: {
+          select: { id: true, name: true, email: true, avatar: true }
+        }
+      }
     });
 
     if (!board) {
@@ -138,7 +144,24 @@ export async function GET(
       }
     });
 
-    return NextResponse.json(members);
+    // Ensure owner is always present and always labeled as owner
+    const normalized = members.map((m) =>
+      String(m.userId) === String(board.ownerId) ? { ...m, role: 'owner' } : m
+    );
+
+    const ownerAlreadyPresent = normalized.some((m) => String(m.userId) === String(board.ownerId));
+    if (!ownerAlreadyPresent && board.owner) {
+      normalized.unshift({
+        id: `owner-${board.owner.id}`,
+        boardId: board.id,
+        userId: board.owner.id,
+        role: 'owner',
+        createdAt: new Date(0),
+        user: board.owner,
+      } as any);
+    }
+
+    return NextResponse.json(normalized);
   } catch (error) {
     console.error('Get members error:', error);
     return NextResponse.json({ error: 'Failed to get members' }, { status: 500 });
