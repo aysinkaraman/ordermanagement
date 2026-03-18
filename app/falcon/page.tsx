@@ -1284,7 +1284,7 @@ export default function App() {
 
     // Persist list order so it doesn't reset after refresh/polling
     try {
-      await Promise.all(
+      const persistResults = await Promise.all(
         next.map((c, idx) =>
           fetch(`/api/columns/${c.id}`, {
             method: 'PATCH',
@@ -1296,6 +1296,10 @@ export default function App() {
           })
         )
       );
+
+      if (persistResults.some((r) => !r.ok)) {
+        throw new Error('One or more column order updates failed');
+      }
     } catch (e) {
       console.error('Persist column order failed', e);
       // Recover from server truth if persistence fails

@@ -18,12 +18,27 @@ export async function PATCH(
         ...(isArchived !== undefined && { isArchived }),
         ...(color !== undefined && { color }),
       },
-      include: {
+      // Keep PATCH response lightweight; heavy nested includes can cause slowdowns
+      // during bulk reorder operations.
+      select: {
+        id: true,
+        title: true,
+        order: true,
+        isArchived: true,
+        boardId: true,
+        user: { select: { id: true, name: true, avatar: true } },
         cards: {
-          include: {
-            comments: true,
-            activities: true,
-            attachments: true,
+          where: { isArchived: false },
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            columnId: true,
+            title: true,
+            description: true,
+            order: true,
+            createdAt: true,
+            dueDate: true,
+            user: { select: { id: true, name: true, avatar: true } },
           },
         },
       },
