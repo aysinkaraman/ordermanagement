@@ -684,9 +684,25 @@ export default function App() {
     }
   };
 
+  const canCurrentUserManageBoardMembers = () => {
+    if (!currentUser || !currentBoardId) return false;
+
+    const activeBoard = boards.find((b: any) => String(b.id) === String(currentBoardId));
+    const isOwner = String(activeBoard?.ownerId || '') === String(currentUser.id);
+    if (isOwner) return true;
+
+    const meMember = boardMembers.find((m: any) => String(m.user?.id || '') === String(currentUser.id));
+    const myRole = String(meMember?.role || '').toLowerCase();
+    return myRole === 'admin' || myRole === 'owner';
+  };
+
   const handleRemoveMember = async (memberId: string) => {
     if (!confirm('Remove this member from the board?')) return;
     if (!currentBoardId) return;
+    if (!canCurrentUserManageBoardMembers()) {
+      alert('❌ Not authorized: only board owner/admin can remove members');
+      return;
+    }
 
     try {
       const response = await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, {
@@ -3544,6 +3560,8 @@ export default function App() {
   function renderShareModal() {
     if (!showShareModal) return null;
 
+  const canManageMembers = canCurrentUserManageBoardMembers();
+
   return (
     <div
       style={{
@@ -3598,21 +3616,26 @@ export default function App() {
           </div>
           <button
             onClick={handleShareBoard}
-            disabled={sharingLoading || !shareEmail.trim()}
+            disabled={sharingLoading || !shareEmail.trim() || !canManageMembers}
             style={{
               width: '100%',
               padding: '10px',
               borderRadius: 8,
               border: 'none',
-              background: sharingLoading || !shareEmail.trim() ? '#ccc' : primaryColor,
+              background: sharingLoading || !shareEmail.trim() || !canManageMembers ? '#ccc' : primaryColor,
               color: '#fff',
-              cursor: sharingLoading || !shareEmail.trim() ? 'not-allowed' : 'pointer',
+              cursor: sharingLoading || !shareEmail.trim() || !canManageMembers ? 'not-allowed' : 'pointer',
               fontSize: 14,
               fontWeight: 600,
             }}
           >
             {sharingLoading ? 'Adding...' : '➕ Add Member'}
           </button>
+          {!canManageMembers && (
+            <div style={{ marginTop: 8, color: '#9a3412', fontSize: 12 }}>
+              Only board owner/admin can add or remove members.
+            </div>
+          )}
         </div>
 
         {/* Members List */}
@@ -3673,7 +3696,7 @@ export default function App() {
                     >
                       {member.role}
                     </span>
-                    {member.role !== 'owner' && (
+                    {canManageMembers && member.role !== 'owner' && (
                       <button
                         onClick={() => handleRemoveMember(member.id)}
                         style={{
