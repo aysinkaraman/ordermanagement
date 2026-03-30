@@ -188,6 +188,8 @@ export default function App() {
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const [creatingBoard, setCreatingBoard] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now());
+  const [archivedSearchMatches, setArchivedSearchMatches] = useState<Array<Card & { columnName: string }>>([]);
+  const [archivedSearchLoading, setArchivedSearchLoading] = useState(false);
 
   const loadBoardById = async (boardId: string) => {
     try {
@@ -244,7 +246,7 @@ export default function App() {
         }
       }
       
-      applyBoardTheme(board.id, board.title || '');
+      applyBoardTheme(board);
       try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
       console.error('Load board failed', e);
@@ -460,6 +462,53 @@ export default function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [currentBoardId, showArchived, archiveMode]);
+
+  // Include archived cards in global search results so order numbers remain discoverable.
+  useEffect(() => {
+    let cancelled = false;
+
+    if (showArchived || !currentBoardId || !globalSearch.trim()) {
+      setArchivedSearchMatches([]);
+      setArchivedSearchLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setArchivedSearchLoading(true);
+      try {
+        const res = await fetch(`/api/columns?archived=true&mode=cards&boardId=${encodeURIComponent(currentBoardId)}`, {
+          cache: 'no-store',
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Failed to load archived cards for search');
+
+        const archivedColumns = (data || []).map(mapApiColumn);
+        const query = globalSearch.toLowerCase().trim();
+        const matches: Array<Card & { columnName: string }> = [];
+
+        archivedColumns.forEach((col: Column) => {
+          col.cards.forEach((card: Card) => {
+            const orderNum = String(card.orderNumber || '').toLowerCase().trim();
+            const custName = String(card.customerName || '').toLowerCase().trim();
+            if (orderNum.includes(query) || custName.includes(query)) {
+              matches.push({ ...card, columnName: col.name });
+            }
+          });
+        });
+
+        if (!cancelled) setArchivedSearchMatches(matches);
+      } catch (err) {
+        if (!cancelled) setArchivedSearchMatches([]);
+      } finally {
+        if (!cancelled) setArchivedSearchLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [globalSearch, currentBoardId, showArchived]);
 
   // Helpers
   const findColumnById = (colId: string | number, cols: Column[] = columns) =>
@@ -781,7 +830,24 @@ export default function App() {
       if (!res.ok) throw new Error(data?.error || 'Failed to load boards');
       const list = Array.isArray(data) ? data : [];
       setBoards(list);
-      // Do not auto-select first board here; `lastBoardId` loader handles selection.
+
+      // If no board is selected and there is no lastBoardId, select the first accessible board.
+      // This ensures logo/theme are loaded after login/logout without requiring manual board selection.
+      if (!currentBoardId) {
+        const lastId = localStorage.getItem('lastBoardId');
+        const initialBoard = lastId
+          ? list.find((b: any) => String(b.id) === String(lastId))
+          : list[0];
+
+        if (initialBoard) {
+          setCurrentBoardId(initialBoard.id);
+          setBoardTitle(initialBoard.title || 'Falcon Board');
+          setCompanyLogo(initialBoard.logo || null);
+          await loadBoardById(initialBoard.id);
+          loadBoardMembers(initialBoard.id);
+          try { localStorage.setItem('lastBoardId', initialBoard.id); } catch {}
+        }
+      }
     } catch (e) {
       console.error('Failed to load boards', e);
     }
@@ -2199,30 +2265,88 @@ export default function App() {
     // Do not load old 'companyLogo' localStorage key - it's deprecated
   }, []);
   
-  const applyTheme = (primary: string, secondary: string) => {
+  const cacheBoardTheme = (boardId: string, primary: string, secondary: string) => {
+    try {
+      const raw = localStorage.getItem('boardThemes');
+      const themes = raw ? JSON.parse(raw) : {};
+      localStorage.setItem('boardThemes', JSON.stringify({
+        ...themes,
+        [boardId]: { primary, secondary },
+      }));
+    } catch {}
+  };
+
+  const persistBoardTheme = async (boardId: string, primary: string, secondary: string) => {
+    cacheBoardTheme(boardId, primary, secondary);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ primaryColor: primary, secondaryColor: secondary }),
+      });
+      if (!res.ok) {
+        console.warn('Theme save failed on server, using local board cache only');
+      }
+    } catch (err) {
+      console.warn('Theme save request failed, using local board cache only', err);
+    }
+  };
+
+  const applyTheme = (
+    primary: string,
+    secondary: string,
+    options?: { persist?: boolean; boardId?: string | null }
+  ) => {
     setPrimaryColor(primary);
     setSecondaryColor(secondary);
     localStorage.setItem('primaryColor', primary);
     localStorage.setItem('secondaryColor', secondary);
+
+    if (options?.persist === false) return;
+
+    const boardId = options?.boardId ?? currentBoardId;
+    if (boardId) {
+      void persistBoardTheme(boardId, primary, secondary);
+    }
   };
 
-  const applyBoardTheme = (boardId: string, title: string) => {
+  const applyBoardTheme = (board: any) => {
+    const boardId = String(board?.id || '');
+    const title = String(board?.title || '');
+    if (!boardId) return;
+
+    // 1) Source of truth: persisted board theme in DB
+    if (board?.primaryColor && board?.secondaryColor) {
+      applyTheme(board.primaryColor, board.secondaryColor, { persist: false, boardId });
+      cacheBoardTheme(boardId, board.primaryColor, board.secondaryColor);
+      return;
+    }
+
+    // 2) Fallback: board-specific local cache
     try {
       const raw = localStorage.getItem('boardThemes');
       const themes = raw ? JSON.parse(raw) : {};
       const existing = themes?.[boardId];
       if (existing && existing.primary && existing.secondary) {
-        applyTheme(existing.primary, existing.secondary);
+        applyTheme(existing.primary, existing.secondary, { persist: false, boardId });
         return;
       }
+
+      // 3) First-time default per board
       const isStandup = /standup/i.test(title);
       const preset = isStandup
         ? { primary: '#DB2777', secondary: '#9F1239' }
         : { primary: '#D97706', secondary: '#92400E' };
-      applyTheme(preset.primary, preset.secondary);
-      const next = { ...themes, [boardId]: preset };
-      localStorage.setItem('boardThemes', JSON.stringify(next));
-    } catch {}
+
+      applyTheme(preset.primary, preset.secondary, { persist: false, boardId });
+      cacheBoardTheme(boardId, preset.primary, preset.secondary);
+    } catch {
+      applyTheme('#D97706', '#92400E', { persist: false, boardId });
+    }
   };
 
   // Calculate stats for a column
@@ -2402,7 +2526,10 @@ export default function App() {
           />
           {globalSearch && (
             <button
-              onClick={() => setGlobalSearch('')}
+              onClick={() => {
+                setGlobalSearch('');
+                setArchivedSearchMatches([]);
+              }}
               style={{
                 position: 'absolute',
                 right: 8,
@@ -2419,6 +2546,62 @@ export default function App() {
             >
               ×
             </button>
+          )}
+
+          {globalSearch.trim() && !showArchived && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                left: 0,
+                width: 340,
+                maxWidth: '90vw',
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                zIndex: 1200,
+                color: '#111827',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, background: '#f9fafb', borderBottom: '1px solid #f0f0f0' }}>
+                Archived matches {archivedSearchLoading ? '(loading...)' : `(${archivedSearchMatches.length})`}
+              </div>
+              {archivedSearchMatches.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: '#6b7280' }}>
+                  {archivedSearchLoading ? 'Searching archived cards...' : 'No archived cards matched this search.'}
+                </div>
+              ) : (
+                <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  {archivedSearchMatches.slice(0, 8).map((card) => (
+                    <button
+                      key={`arch-match-${card.id}`}
+                      onClick={() => {
+                        setShowArchived(true);
+                        setArchiveMode('cards');
+                        setSearchQuery(globalSearch);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        background: '#fff',
+                        border: 'none',
+                        borderBottom: '1px solid #f3f4f6',
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{card.orderNumber || 'Untitled'}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{card.columnName}</span>
+                        <span style={{ color: '#92400E', fontWeight: 600 }}>Archived</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -3476,7 +3659,6 @@ export default function App() {
                   setBoardTitle(board.title || 'Falcon Board');
                   setCompanyLogo(board.logo || null);
                   await loadBoardById(board.id);
-                  applyBoardTheme(board.id, board.title || '');
                   loadBoardMembers(board.id);
                   setShowBoardSelector(false);
                   try { localStorage.setItem('lastBoardId', board.id); } catch {}

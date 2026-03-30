@@ -35,6 +35,8 @@ export async function GET(
         ownerId: true,
         teamId: true,
         logo: true,
+        primaryColor: true,
+        secondaryColor: true,
         createdAt: true,
         updatedAt: true,
         owner: {
@@ -105,7 +107,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { title, isPublic, logo } = await request.json();
+    const { title, isPublic, logo, primaryColor, secondaryColor } = await request.json();
 
     // Check if user is owner or admin
     const board = await prisma.board.findFirst({
@@ -127,7 +129,9 @@ export async function PATCH(
       data: ({
         ...(title !== undefined && { title }),
         ...(isPublic !== undefined && { isPublic }),
-        ...(logo !== undefined && { logo })
+        ...(logo !== undefined && { logo }),
+        ...(primaryColor !== undefined && { primaryColor }),
+        ...(secondaryColor !== undefined && { secondaryColor })
       } as any)
     });
 

@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
         ownerId: true,
         teamId: true,
         logo: true,
+        primaryColor: true,
+        secondaryColor: true,
         createdAt: true,
         updatedAt: true,
         owner: {
@@ -115,6 +117,8 @@ export async function POST(request: NextRequest) {
           ownerId: true,
           teamId: true,
           logo: true,
+          primaryColor: true,
+          secondaryColor: true,
           createdAt: true,
           updatedAt: true,
           owner: { select: { id: true, name: true, email: true, avatar: true } }
