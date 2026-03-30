@@ -2030,59 +2030,120 @@ export default function App() {
   };
 
   // Render
+  // Compress image to base64 with size limit
+  const compressImageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxWidth = 200;
+          const maxHeight = 200;
+          let width = img.width;
+          let height = img.height;
+
+          // Resize if too large
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          // Convert to JPEG with compression
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.9);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      setCompanyLogo(dataUrl);
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('❌ File too large. Max size is 5MB.');
+      return;
+    }
+
+    try {
+      console.log('📸 Compressing image...');
+      const compressedBase64 = await compressImageToBase64(file);
+      console.log(`✅ Image compressed. Size: ${(compressedBase64.length / 1024).toFixed(2)}KB`);
+      setCompanyLogo(compressedBase64);
 
       // Persist per-board logo if a board is selected
       try {
         if (currentBoardId) {
           const token = localStorage.getItem('token');
+          console.log('📤 Saving compressed logo to database...');
           const resp = await fetch(`/api/boards/${currentBoardId}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
               ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
             },
-            body: JSON.stringify({ logo: dataUrl }),
+            body: JSON.stringify({ logo: compressedBase64 }),
           });
           if (!resp.ok) {
-            console.warn('Failed to save logo to database:', resp.status, resp.statusText);
+            console.warn('❌ Failed to save logo to database:', resp.status, resp.statusText);
             // If server persistence fails (e.g., permission), keep in localStorage per board
             const raw = localStorage.getItem('boardLogos');
             const logos = raw ? JSON.parse(raw) : {};
-            const next = { ...logos, [currentBoardId]: dataUrl };
+            const next = { ...logos, [currentBoardId]: compressedBase64 };
             localStorage.setItem('boardLogos', JSON.stringify(next));
+            alert('⚠️ Logo saved locally. It will sync to server when available.');
           } else {
             // On success, also mirror to local for resilience
             const raw = localStorage.getItem('boardLogos');
             const logos = raw ? JSON.parse(raw) : {};
-            const next = { ...logos, [currentBoardId]: dataUrl };
+            const next = { ...logos, [currentBoardId]: compressedBase64 };
             localStorage.setItem('boardLogos', JSON.stringify(next));
             console.log('✅ Logo saved to database successfully');
+            alert('✅ Logo uploaded successfully! It will persist after logout/login.');
           }
         } else {
+          alert('❌ Please select a board first');
           console.warn('No current board ID, cannot save logo');
         }
       } catch (err) {
-        console.warn('Failed to persist logo to board', err);
+        console.warn('❌ Failed to persist logo to board', err);
+        alert('❌ Failed to save logo. Will try again later.');
         // Network error: store locally as fallback
         if (currentBoardId) {
           try {
             const raw = localStorage.getItem('boardLogos');
             const logos = raw ? JSON.parse(raw) : {};
-            const next = { ...logos, [currentBoardId]: dataUrl };
+            const next = { ...logos, [currentBoardId]: compressedBase64 };
             localStorage.setItem('boardLogos', JSON.stringify(next));
           } catch {}
         }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('❌ Image compression failed:', err);
+      alert('❌ Failed to compress image. Try a different file.');
+    }
 
     if (logoInputRef.current) {
       logoInputRef.current.value = '';
