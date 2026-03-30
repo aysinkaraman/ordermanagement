@@ -3,8 +3,8 @@ import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kanban Board",
-  description: "A Trello-like Kanban board application",
+  title: "Falcon Board",
+  description: "Falcon Transfers order management application",
 };
 
 export default function RootLayout({
