@@ -538,8 +538,31 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      
+      // Clear authentication tokens
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      
+      // SECURITY: Clear all per-user state from localStorage to prevent leaking to next user
+      localStorage.removeItem('companyName');
+      localStorage.removeItem('boardTitle');
+      localStorage.removeItem('boardLogos');           // Clear all user's logos
+      localStorage.removeItem('primaryColor');         // Clear user's theme
+      localStorage.removeItem('secondaryColor');       // Clear user's theme
+      localStorage.removeItem('boardThemes');          // Clear user's board-specific themes
+      localStorage.removeItem('lastBoardId');          // Don't auto-load previous user's board
+      
+      // Clear React state to ensure clean slate
+      setCompanyLogo(null);
+      setPrimaryColor('#D97706');
+      setSecondaryColor('#92400E');
+      setCurrentBoardId(null);
+      setCurrentBoardOwnerId(null);
+      setColumns([]);
+      setBoardMembers([]);
+      setBoards([]);
+      
+      console.log('✅ User logged out. All user-specific data cleared.');
       window.location.href = '/login';
     } catch (e) {
       console.error('Logout failed', e);
