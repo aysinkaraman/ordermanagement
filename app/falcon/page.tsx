@@ -330,32 +330,6 @@ export default function App() {
     cards: (apiCol.cards || []).map(mapApiCard),
   });
 
-  const pastelPalette = [
-    '#FFD6E0', // pink
-    '#D6EFFF', // blue
-    '#FFF9D6', // yellow
-    '#D6FFD6', // green
-    '#E0D6FF', // purple
-    '#FFEFD6', // orange
-    '#D6FFF6', // teal
-    '#FFF6D6', // light yellow
-    '#FFD6F6', // magenta
-    '#D6FFF9', // aqua
-  ];
-
-  const pastelPaletteDark = [
-    '#3b1f2b', // dark pink
-    '#1f2b3b', // dark blue
-    '#3b3b1f', // dark yellow
-    '#1f3b2b', // dark green
-    '#2b1f3b', // dark purple
-    '#3b2b1f', // dark orange
-    '#1f3b3a', // dark teal
-    '#3a3b1f', // dark light yellow
-    '#3b1f3a', // dark magenta
-    '#1f3b39', // dark aqua
-  ];
-
   // Load user from localStorage (do not derive board logo from avatar)
   useEffect(() => {
     const userStr = localStorage.getItem('user');
