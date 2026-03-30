@@ -213,17 +213,37 @@ export default function App() {
       setBoardTitle(board.title || 'Falcon Board');
       setCurrentBoardId(board.id);
       setCurrentBoardOwnerId(board.ownerId || null);
+      
+      // Load logo from database (with fallback to localStorage)
       if (board.logo) {
+        console.log('✅ Loaded board logo from database');
         setCompanyLogo(board.logo);
+        // Also cache in localStorage as backup
+        try {
+          const raw = localStorage.getItem('boardLogos');
+          const logos = raw ? JSON.parse(raw) : {};
+          logos[boardId] = board.logo;
+          localStorage.setItem('boardLogos', JSON.stringify(logos));
+        } catch {}
       } else {
         // Fallback: use locally stored logo per-board if server has none
         try {
           const raw = localStorage.getItem('boardLogos');
           const logos = raw ? JSON.parse(raw) : {};
           const localLogo = logos?.[boardId];
-          if (localLogo) setCompanyLogo(localLogo);
-        } catch {}
+          if (localLogo) {
+            console.log('✅ Loaded board logo from localStorage fallback');
+            setCompanyLogo(localLogo);
+          } else {
+            console.log('ℹ️ No logo found for this board');
+            setCompanyLogo(null);
+          }
+        } catch (err) {
+          console.warn('Error loading logo from fallback:', err);
+          setCompanyLogo(null);
+        }
       }
+      
       applyBoardTheme(board.id, board.title || '');
       try { localStorage.setItem('lastBoardId', board.id); } catch {}
     } catch (e) {
@@ -2016,18 +2036,21 @@ export default function App() {
     reader.onload = async () => {
       const dataUrl = reader.result as string;
       setCompanyLogo(dataUrl);
-      // No longer store a global companyLogo; logo is per-board.
-      try { localStorage.removeItem('companyLogo'); } catch {}
 
       // Persist per-board logo if a board is selected
       try {
         if (currentBoardId) {
+          const token = localStorage.getItem('token');
           const resp = await fetch(`/api/boards/${currentBoardId}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({ logo: dataUrl }),
           });
           if (!resp.ok) {
+            console.warn('Failed to save logo to database:', resp.status, resp.statusText);
             // If server persistence fails (e.g., permission), keep in localStorage per board
             const raw = localStorage.getItem('boardLogos');
             const logos = raw ? JSON.parse(raw) : {};
@@ -2039,7 +2062,10 @@ export default function App() {
             const logos = raw ? JSON.parse(raw) : {};
             const next = { ...logos, [currentBoardId]: dataUrl };
             localStorage.setItem('boardLogos', JSON.stringify(next));
+            console.log('✅ Logo saved to database successfully');
           }
+        } else {
+          console.warn('No current board ID, cannot save logo');
         }
       } catch (err) {
         console.warn('Failed to persist logo to board', err);
@@ -2073,17 +2099,18 @@ export default function App() {
 
   // Load branding and theme from localStorage
   useEffect(() => {
-    const savedLogo = localStorage.getItem('companyLogo');
     const savedCompanyName = localStorage.getItem('companyName');
     const savedBoardTitle = localStorage.getItem('boardTitle');
     const savedPrimaryColor = localStorage.getItem('primaryColor');
     const savedSecondaryColor = localStorage.getItem('secondaryColor');
     
-    if (!companyLogo && savedLogo) setCompanyLogo(savedLogo);
     if (savedCompanyName) setCompanyName(savedCompanyName);
     if (savedBoardTitle) setBoardTitle(savedBoardTitle);
     if (savedPrimaryColor) setPrimaryColor(savedPrimaryColor);
     if (savedSecondaryColor) setSecondaryColor(savedSecondaryColor);
+    
+    // Note: Logo is loaded per-board via loadBoardById() and stored in database
+    // Do not load old 'companyLogo' localStorage key - it's deprecated
   }, []);
   
   const applyTheme = (primary: string, secondary: string) => {
