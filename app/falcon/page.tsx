@@ -262,15 +262,41 @@ export default function App() {
   }, []);
   
   const themePresets = [
-    { name: 'Professional Orange', primary: '#D97706', secondary: '#92400E' },
-    { name: 'Rich Brown', primary: '#8B5A00', secondary: '#5C3600' },
-    { name: 'Burnt Orange', primary: '#CC5500', secondary: '#662A00' },
-    { name: 'Dark Gold', primary: '#B8860B', secondary: '#8B6914' },
-    { name: 'Copper Tone', primary: '#B87333', secondary: '#753D1E' },
-    { name: 'Terra Cotta', primary: '#C86432', secondary: '#803D2A' },
-    { name: 'Deep Brown', primary: '#654321', secondary: '#3D2817' },
-    { name: 'Warm Sienna', primary: '#A0522D', secondary: '#6B3410' },
+    { name: 'Amber (Default)', primary: '#D97706', secondary: '#92400E' },
+    { name: 'Blue Ocean', primary: '#0284C7', secondary: '#075985' },
+    { name: 'Purple Dream', primary: '#9333EA', secondary: '#6B21A8' },
+    { name: 'Green Forest', primary: '#059669', secondary: '#047857' },
+    { name: 'Red Fire', primary: '#DC2626', secondary: '#991B1B' },
+    { name: 'Pink Sunset', primary: '#DB2777', secondary: '#9F1239' },
+    { name: 'Teal Wave', primary: '#0D9488', secondary: '#115E59' },
+    { name: 'Indigo Night', primary: '#4F46E5', secondary: '#3730A3' },
   ];
+
+  // Generate column colors based on active theme
+  const getColumnColor = (columnIndex: number): string => {
+    const shades = [
+      primaryColor,                    // Shade 1: Primary
+      adjustBrightness(primaryColor, 20),   // Shade 2: Lighter
+      adjustBrightness(primaryColor, -10),  // Shade 3: Darker
+      adjustBrightness(primaryColor, 30),   // Shade 4: Much lighter
+      adjustBrightness(primaryColor, -20),  // Shade 5: Much darker
+      adjustBrightness(primaryColor, 15),   // Shade 6: Slightly lighter
+      adjustBrightness(primaryColor, -15),  // Shade 7: Slightly darker
+      adjustBrightness(primaryColor, 25),   // Shade 8: Medium light
+    ];
+    return shades[columnIndex % shades.length];
+  };
+
+  // Helper to adjust color brightness
+  const adjustBrightness = (color: string, percent: number): string => {
+    const usePound = color[0] === '#';
+    const col = usePound ? color.slice(1) : color;
+    const num = parseInt(col, 16);
+    const r = Math.max(0, Math.min(255, (num >> 16) + percent));
+    const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + percent));
+    const b = Math.max(0, Math.min(255, (num & 0x0000FF) + percent));
+    return (usePound ? '#' : '') + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  };
 
   const mapApiAttachment = (apiAtt: any): Attachment => ({
     id: apiAtt.id,
@@ -1414,8 +1440,10 @@ export default function App() {
   };
 
   const renderColumn = (col: Column) => {
+    const columnIndex = columns.findIndex(c => c.id === col.id);
     const isMenuOpen = openListMenuId === col.id;
     const isAddCardActive = activeAddColumnId === col.id;
+    const columnColor = getColumnColor(columnIndex);
 
     return (
       <div
@@ -1423,7 +1451,7 @@ export default function App() {
         onDragOver={handleColumnDragOver}
         onDrop={(e) => handleColumnDrop(e, col.id)}
         style={{
-          background: (darkMode ? pastelPaletteDark : pastelPalette)[(columns.findIndex(c => c.id === col.id)) % pastelPalette.length],
+          background: columnColor,
           borderRadius: 10,
           boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
           padding: compactView ? 8 : 10,
