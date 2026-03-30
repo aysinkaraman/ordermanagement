@@ -703,7 +703,11 @@ export default function App() {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Remove this member from the board?')) return;
+    const deleteAccount = confirm(
+      'Remove this member from the board?\n\n' +
+      'Choose OK to ALSO delete their user account (if they have no other boards/teams).\n' +
+      'Choose Cancel to only remove them from this board.'
+    );
     if (!currentBoardId) return;
     if (!canCurrentUserManageBoardMembers()) {
       alert('❌ Not authorized: only board owner/admin can remove members');
@@ -711,7 +715,8 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`/api/boards/${currentBoardId}/members/${memberId}`, {
+      const url = `/api/boards/${currentBoardId}/members/${memberId}${deleteAccount ? '?deleteAccount=true' : ''}`;
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: {
           ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
@@ -723,7 +728,7 @@ export default function App() {
         throw new Error(data?.error || 'Failed to remove member');
       }
 
-      alert('✅ Member removed');
+      alert(data.accountDeleted ? '✅ Member and account deleted' : '✅ Member removed');
       loadBoardMembers(currentBoardId);
     } catch (e: any) {
       alert(`❌ ${e.message || 'Failed to remove member'}`);

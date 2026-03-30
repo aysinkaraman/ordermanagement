@@ -16,18 +16,29 @@ export async function POST(
     const { email, role } = await request.json();
 
     // Check if user can share this board (owner or any existing member)
-    const board = await prisma.board.findFirst({
+    const board = await prisma.board.findUnique({
       where: {
         id: params.id,
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } }
-        ]
       },
       select: { id: true, ownerId: true }
     });
 
     if (!board) {
+      return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    }
+
+    // Allow sharing if user is the owner OR is a member of the board
+    const isOwner = String(board.ownerId) === String(userId);
+    const isMember = !isOwner && await prisma.boardMember.findUnique({
+      where: {
+        boardId_userId: {
+          boardId: params.id,
+          userId
+        }
+      }
+    });
+
+    if (!isOwner && !isMember) {
       return NextResponse.json({ error: 'Not authorized to share this board' }, { status: 403 });
     }
 
@@ -97,7 +108,8 @@ export async function POST(
     });
   } catch (error) {
     console.error('Add member error:', error);
-    return NextResponse.json({ error: 'Failed to add member' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add member';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 

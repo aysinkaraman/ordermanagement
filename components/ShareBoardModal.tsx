@@ -46,11 +46,16 @@ export const ShareBoardModal: React.FC<ShareBoardModalProps> = ({
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Remove this member?')) return;
+    const deleteAccount = confirm(
+      'Remove this member from the board?\n\n' +
+      'Choose OK to ALSO delete their user account (if they have no other boards/teams).\n' +
+      'Choose Cancel to only remove them from this board.'
+    );
 
     try {
-      await axios.delete(`/api/boards/${boardId}/members/${memberId}`);
-      toast.success('Member removed');
+      const url = `/api/boards/${boardId}/members/${memberId}${deleteAccount ? '?deleteAccount=true' : ''}`;
+      await axios.delete(url);
+      toast.success(deleteAccount ? 'Member and account deleted' : 'Member removed');
       onMemberAdded();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to remove member');
